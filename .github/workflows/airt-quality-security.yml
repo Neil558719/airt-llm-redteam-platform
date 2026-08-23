@@ -3,6 +3,7 @@ name: Airt unified quality and security checks
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   offline:
@@ -125,3 +126,4 @@ jobs:
           fi
       - name: Run unified gate
         run: .venv/bin/python scripts/unified_gate.py --results LLM应用测试框架/reports/evaluation-result-v1.jsonl --min-quality-pass-rate 1.0 --max-latency-ms 5000
+
