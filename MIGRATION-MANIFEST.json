@@ -1,0 +1,376 @@
+{
+  "format": 1,
+  "source": "current working tree snapshot; credentials and runtime artifacts excluded",
+  "files": [
+    {
+      "path": ".gitignore",
+      "size": 125,
+      "sha256": "18e166d986af53870220e04ece2996b5ba41a8becd43a08755128f862691c03d"
+    },
+    {
+      "path": "cases/data_exfiltration.yaml",
+      "size": 656,
+      "sha256": "1f2812022b2d23e685cedf393dc7bdd89d44c6d39920d1713c46742a307d9712"
+    },
+    {
+      "path": "cases/dify-agent.yaml",
+      "size": 2704,
+      "sha256": "9e005a54a2b72a531344280dcd9c58d4884884a1fda1e42ed64c481e132915cd"
+    },
+    {
+      "path": "cases/dify.yaml",
+      "size": 2859,
+      "sha256": "759b01ece09699a87c08f98902040f01bcfc84a617357f0685ae64b42f52122e"
+    },
+    {
+      "path": "cases/encoding_obfuscation.yaml",
+      "size": 651,
+      "sha256": "c6dde6022e96cea6bf1b66c89c46dde5df6e9ee2e43622f81b1eccbac63d0dcc"
+    },
+    {
+      "path": "cases/goal_hijacking.yaml",
+      "size": 631,
+      "sha256": "e04f7cf8f3c80413d9a3d55ce0a0dda21e3bb98c41c1d8b66fbb5321ae35f719"
+    },
+    {
+      "path": "cases/indirect_injection.yaml",
+      "size": 736,
+      "sha256": "05601e0d848707019be0e0b60aa6ac5326c78f313918acfbe6e8997c19c77b6d"
+    },
+    {
+      "path": "cases/jailbreak.yaml",
+      "size": 612,
+      "sha256": "a6f2ac5e652f854efc8c4bb9a2e6410bd92b6acae0a9dd15340521a2a9888ec2"
+    },
+    {
+      "path": "cases/prompt_injection.yaml",
+      "size": 624,
+      "sha256": "b5b8fb961d5557836aaebb8e86fb3b94c7ef045bbc9c460f4471a3501733d287"
+    },
+    {
+      "path": "cases/roleplay.yaml",
+      "size": 580,
+      "sha256": "bc61dbdfa6751195b78646b19753e725fb2da440b59216ac19f56b7ae75cceee"
+    },
+    {
+      "path": "cases/sensitive/.gitkeep",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "config.dify.agent.yaml",
+      "size": 2338,
+      "sha256": "f7f9a0c47126ff7ee6ee6f08fce744f21f4cf10d4363df417dbbdfec7ee3d523"
+    },
+    {
+      "path": "config.dify.with-judge.yaml",
+      "size": 3900,
+      "sha256": "bfd15dc04d6eb5cc7979ed84e3e22d880d0921b0469c53e94d36874d48cd9e05"
+    },
+    {
+      "path": "config.dify.yaml",
+      "size": 6433,
+      "sha256": "d3130e17c29e33e33b4f5f24e49c9d33e9b72b19fa83952939a5c4230e5dea22"
+    },
+    {
+      "path": "config.example.yaml",
+      "size": 1756,
+      "sha256": "297c8336c59de7475efff996cb995cbff9f922579327cfc277a6507d6780a0df"
+    },
+    {
+      "path": "dify_agent_tools/custom_tool_openapi.yaml",
+      "size": 2645,
+      "sha256": "0a82c6f884da4cda725a85cb322111d47a7a2dc73900b52526515f0f0e44d6b8"
+    },
+    {
+      "path": "dify_agent_tools/echo_server.py",
+      "size": 2335,
+      "sha256": "23c76cc2655e3b7fe7747a9146ef6dda34f1fdda0603f771dd72276d65bdf8fa"
+    },
+    {
+      "path": "dify_agent_tools/migrate_agent_to_chatflow.sql",
+      "size": 6957,
+      "sha256": "6cb2ff37f8025bf36e4325b3cbf9ae2dc3a53d34f945cb8c51289318f8bcf00f"
+    },
+    {
+      "path": "dify_agent_tools/provision_agent_app.sql",
+      "size": 8764,
+      "sha256": "6ea06ecac7777e7c323b794a103b1678f9fb30fc0c7b60869ad9e5aa81a32d87"
+    },
+    {
+      "path": "dify_agent_tools/validate_chatflow_graph.py",
+      "size": 892,
+      "sha256": "b162cfab25110a386140c722754ff5f1d97811982db0872e93be42ede2c7a899"
+    },
+    {
+      "path": "DIFY_MIGRATION_CHECKLIST.md",
+      "size": 2036,
+      "sha256": "6f75bbc8295a375f0059916fe90c914f84924ef3f534e2d9b23586503c52ea8a"
+    },
+    {
+      "path": "docs/AI红队测试工具工作原理与用例详解.md",
+      "size": 48456,
+      "sha256": "9b486f054cb1195db9b8955151889a7745503587da5e931305046948b03eeb37"
+    },
+    {
+      "path": "docs/Dify接入与运行速查手册.md",
+      "size": 38078,
+      "sha256": "91f59f5feac9631acf82b23343ab007091744300b7e5605a65eb5ef833b86283"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-08-17-ai-redteam-tool.md",
+      "size": 41397,
+      "sha256": "c553ca46e0c73a12121d6f0393bf25b5531868aa2d6c7da633bfbef2e4b8317b"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-08-17-ai-redteam-tool-design.md",
+      "size": 12067,
+      "sha256": "d5b38104110cdecd70cbc4797168a8eb1d9774814fd9e43f336128e192af0ab3"
+    },
+    {
+      "path": "install_python314.ps1",
+      "size": 978,
+      "sha256": "25fbf994f373599dacf63c6d539e176674d1696d4bdd97734d3309192be922ab"
+    },
+    {
+      "path": "knowledge/dify/01-订单客服公开规则.md",
+      "size": 1100,
+      "sha256": "66b4cb83eab5b0a33df2601f069819255171ce2337c368316e234c2abcd15bd7"
+    },
+    {
+      "path": "knowledge/dify/02-订单状态说明.md",
+      "size": 1142,
+      "sha256": "e00b444f6083d349bd34b80b9c20adc8879af04d40aab34932ae9ccf2be3979e"
+    },
+    {
+      "path": "knowledge/dify/99-安全测试夹具-间接注入.md",
+      "size": 602,
+      "sha256": "5ba702ee027e6714c1aa72908c5b33a0ad0fb6227cf13223e4a07694f98e34e7"
+    },
+    {
+      "path": "make_manifest.py",
+      "size": 1221,
+      "sha256": "bbaa57ab5eac73bc45931022b4c05c12c566810751415de81e6742ad6c4c4153"
+    },
+    {
+      "path": "MIGRATION_README.md",
+      "size": 4704,
+      "sha256": "c18d1d1f881d11e8a7f7738372a7f68a3b7483fdbc2a7cb116e69a71e96accbf"
+    },
+    {
+      "path": "prompts/dify/订单客服系统提示词.md",
+      "size": 2736,
+      "sha256": "f09bcf03b0545c783e0f2202bd4e3af470dce4a9c5f01273ad6d306991642b6f"
+    },
+    {
+      "path": "pyproject.toml",
+      "size": 732,
+      "sha256": "af6e28a1a6199fc60bd5a15ebba4299896e7f3b13ae35ce267efd2e8ccfd16a9"
+    },
+    {
+      "path": "README.md",
+      "size": 9122,
+      "sha256": "c6dbdf51025ed782c11a62bd4efd6232b23308893c1b3fe67361e78ce2f90525"
+    },
+    {
+      "path": "requirements-runtime.txt",
+      "size": 105,
+      "sha256": "555f86456e393108acb7a35ca249ed836d3f31a4517ef4d5929ccb51bfd5eed8"
+    },
+    {
+      "path": "requirements-test.txt",
+      "size": 137,
+      "sha256": "6f330abd809d3de909c7c8db47893dc6a1cf088303cf1452c345e029d2019366"
+    },
+    {
+      "path": "src/airt/__init__.py",
+      "size": 22,
+      "sha256": "91447944015cec709e8aa7655f7e9d64e1e4508e7023a57fe3746911c0fc6fed"
+    },
+    {
+      "path": "src/airt/adapter.py",
+      "size": 3323,
+      "sha256": "37ad1a73ec5df9d19818f5d14938a9e56c69fc955b0c9ff6217d780b58fbd9a1"
+    },
+    {
+      "path": "src/airt/cases.py",
+      "size": 2766,
+      "sha256": "28e83d3fad035796ced376bedbbe717c144682e819c87777917c354d6c012ed1"
+    },
+    {
+      "path": "src/airt/cli.py",
+      "size": 11350,
+      "sha256": "685eed0c246b11a385ff1a68954cbc4befe04fdf5c5c4400cbdee57b8d060b52"
+    },
+    {
+      "path": "src/airt/config.py",
+      "size": 7001,
+      "sha256": "00127c745dca20150ae57b85f9d80ece79e972756a68660f419915cbf5e68e94"
+    },
+    {
+      "path": "src/airt/dify_adapter.py",
+      "size": 12480,
+      "sha256": "8dfbd8afc0c9569b6c9784d145666ed8ebf2c92f8e51e94e16d1fd4473569a44"
+    },
+    {
+      "path": "src/airt/judge/__init__.py",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/airt/judge/llm.py",
+      "size": 10563,
+      "sha256": "ac98abd4493303fc37b39f27aaae1d3c9caf846c0534acf0ffa6417f356f017d"
+    },
+    {
+      "path": "src/airt/judge/pipeline.py",
+      "size": 1678,
+      "sha256": "140f909db0878fcf7bfcee33a8a225871bd3961bca7ce9e80110ea7a6d57fec0"
+    },
+    {
+      "path": "src/airt/judge/rules.py",
+      "size": 5950,
+      "sha256": "f21208d1a13dfce06bb8e1275a3b4f1c3598fd9399fc8bfee58c8ccdaa4d653c"
+    },
+    {
+      "path": "src/airt/metrics.py",
+      "size": 4276,
+      "sha256": "90f1429f76ad4775500c6baba2361ad3e8a3766b5beb54da3220f3c743a32b24"
+    },
+    {
+      "path": "src/airt/models.py",
+      "size": 6216,
+      "sha256": "40fbcad54fc92642676471116b1c23805b790af6c9eb963e306a511a9abb4bfa"
+    },
+    {
+      "path": "src/airt/report/__init__.py",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/airt/report/archive.py",
+      "size": 1819,
+      "sha256": "e6a8c5cb8d525eef88e7d47d32db7dbaaba4ef78a146f0d7e6f65d60a205d7aa"
+    },
+    {
+      "path": "src/airt/report/console.py",
+      "size": 5459,
+      "sha256": "39f12f1c8de16b951b4f34903335ac0a0c58854ad092743df59d47f5e2503bd8"
+    },
+    {
+      "path": "src/airt/report/html.py",
+      "size": 3007,
+      "sha256": "06867b30bac84838a62d5d11ff2762a8fcd976091a6be91148ad3d2837a603d5"
+    },
+    {
+      "path": "src/airt/report/json_report.py",
+      "size": 2602,
+      "sha256": "c0e1b400b9a41290c912ac354dedf40b3736c5b568386ecad63521b268f5b304"
+    },
+    {
+      "path": "src/airt/report/presentation.py",
+      "size": 6075,
+      "sha256": "4942f257f779fd19a01a12f1230d55d4b9b6cd79a44f8e0f9acb9ed2a53896c6"
+    },
+    {
+      "path": "src/airt/report/templates/report.html.j2",
+      "size": 12128,
+      "sha256": "97806f382a28faa915a4e79003cc3ed188d43ca9b1eca991bea67a2d590ca756"
+    },
+    {
+      "path": "src/airt/runner.py",
+      "size": 8975,
+      "sha256": "bf5f2cf6da04baf1e545b47b33e7f62b6d7cf54c0fa05abed4cd4c6493c23b35"
+    },
+    {
+      "path": "tests/conftest.py",
+      "size": 3350,
+      "sha256": "237a0931a62282071d8608baf8958fd05dc9f3bba26cc56414e8ab761e1cb1fb"
+    },
+    {
+      "path": "tests/test_adapter.py",
+      "size": 4737,
+      "sha256": "47d5e0369eec057b12914c4b0732082785e783a5ac9f90b1e7a52ca69731265a"
+    },
+    {
+      "path": "tests/test_agent_profiles.py",
+      "size": 8599,
+      "sha256": "d65677a69b64a5c0f3577e548ccf3c600a7d898fc30a5a82d4779cb7552c1b74"
+    },
+    {
+      "path": "tests/test_cases.py",
+      "size": 1951,
+      "sha256": "3077bd732b8d9bc9f650310fa041223cbfe65f168a154bf460c64d7b15b7e034"
+    },
+    {
+      "path": "tests/test_cli.py",
+      "size": 9795,
+      "sha256": "e575d5572fae96fbf286435d4a9c250ada55bac4fbfac3e492a81b04b9e4e660"
+    },
+    {
+      "path": "tests/test_config.py",
+      "size": 6628,
+      "sha256": "dff21db53bbc4e39e902def399cf193b913039533e44a21fac6270177e5d3cce"
+    },
+    {
+      "path": "tests/test_dify_adapter.py",
+      "size": 7837,
+      "sha256": "c876694a7904d79350af7415b53bcbd9961e84b20ea6df1d5856191aec70bb90"
+    },
+    {
+      "path": "tests/test_dify_cases.py",
+      "size": 2690,
+      "sha256": "d837c1ead5b5ca39e7582b1dc369071d1960c9ccb1261f60b7730312b0145695"
+    },
+    {
+      "path": "tests/test_judge.py",
+      "size": 15342,
+      "sha256": "5f60ec462c848323514234d7680a8ba73d487dd319c6d288c72bc803ff0d6279"
+    },
+    {
+      "path": "tests/test_live.py",
+      "size": 997,
+      "sha256": "82a90d201aca0a78192fbbc9017606369db41f8c55df735ad1d12e6e78ae2639"
+    },
+    {
+      "path": "tests/test_metrics.py",
+      "size": 4189,
+      "sha256": "0af9cf6b689cd816c3c81e7d446532b4841cd1fd20611d10ad7c1769300d902b"
+    },
+    {
+      "path": "tests/test_models.py",
+      "size": 2602,
+      "sha256": "5607c15f54fb5d0aa53ed83dd84e8081e897fcbc0128505b77f23b1d866d786b"
+    },
+    {
+      "path": "tests/test_report_archive.py",
+      "size": 1876,
+      "sha256": "c2ec316c850adcb4cdbadebb4f6118552cf96cb0eb354f36193f31e9aceb3ba4"
+    },
+    {
+      "path": "tests/test_reports.py",
+      "size": 3478,
+      "sha256": "3ff3d16aa9a75c0b866e01ed01d0654ec4318995b8026e8e058bfc3a51c82789"
+    },
+    {
+      "path": "tests/test_runner.py",
+      "size": 8775,
+      "sha256": "f4c33413b4436549246ff6c2d6f7a7a46edf8c152abf38e15b14506d7adb4d01"
+    },
+    {
+      "path": "tests/test_smoke.py",
+      "size": 152,
+      "sha256": "a5b0f9e19610211b3ff4b0504e80c2063d4862fb7edadc368dd001f19ce538cc"
+    },
+    {
+      "path": "verify_migration.py",
+      "size": 2540,
+      "sha256": "64476b7f9e2269b3b51ea43019d0b07131af8e74211b30e55a798c6d42d1d871"
+    },
+    {
+      "path": "verify_python314.ps1",
+      "size": 912,
+      "sha256": "103b979df1cbeb592dc4603d866e5f465d7d395dcf16ca6ec5388cd97c2f85af"
+    }
+  ]
+}

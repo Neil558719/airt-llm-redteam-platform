@@ -1,0 +1,23 @@
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+**/.pytest_cache/
+*.py[cod]
+*.egg-info/
+**/*.egg-info/
+build/
+dist/
+*.whl
+*.tar.gz
+runs/
+reports/
+backups/
+.env
+.env.*
+*.secrets.*
+
+# Preserve the former standalone repository metadata locally, never publish it
+LLM应用测试框架/.git-standalone-backup/
+

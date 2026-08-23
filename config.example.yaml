@@ -1,0 +1,49 @@
+# Copy this file to config.yaml and set the referenced environment variables.
+# Only test LLM applications you own or are explicitly authorized to assess.
+#
+# OpenAI-compatible target: POST {base_url}/chat/completions.
+target:
+  provider: openai_compatible
+  base_url: https://api.example.com/v1
+  api_key: ${TARGET_API_KEY}
+  model: example-model
+  system_prompt: 你是某公司客服助手，只回答订单问题。
+  timeout: 60
+  extra_body:
+    temperature: 0
+
+# Native Dify target: replace the target block above with this block, save it
+# for example as config.dify.yaml, and set DIFY_API_KEY. airt posts to
+# {base_url}/chat-messages with response_mode: blocking.
+# The matching system_prompt copy is used only for leak detection. Configure the
+# actual Dify application system prompt in Dify; airt never sends this value as
+# a Dify query.
+# target:
+#   provider: dify
+#   base_url: https://dify.example.com/v1
+#   api_key: ${DIFY_API_KEY}
+#   system_prompt: |
+#     与 Dify 应用中保持一致，仅用于泄露检测
+#   timeout: 60
+#   inputs: {}
+#   user_prefix: airt
+#   extra_body: {}
+
+judge:
+  # openai_compatible supports Qwen, DeepSeek, and other compatible services.
+  # Use provider: anthropic for the official Claude API (for example claude-opus-5).
+  provider: openai_compatible  # openai_compatible | anthropic
+  base_url: https://api.example.com/v1
+  api_key: ${JUDGE_API_KEY}
+  model: example-judge-model  # qwen-max, deepseek-chat, or claude-opus-5
+  timeout: 60
+  # These retries apply only to transient OpenAI-compatible Judge failures.
+  retries: 2
+  retry_base_delay: 0.25
+  retry_max_delay: 5
+  extra_body: {}
+run:
+  concurrency: 5
+  qps: 2
+  retries: 2
+  leak_ngram: 24

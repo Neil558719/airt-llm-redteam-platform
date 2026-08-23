@@ -1,0 +1,25 @@
+# 统一 Chatflow 是主目标；旧 Airt 目标保留兼容，FastGPT 适配器仍在 LLM 框架中作为扩展。
+targets:
+  unified_dify_chatflow:
+    provider: dify
+    app_type: advanced-chat
+    base_url: ${AIRT_DIFY_CHATFLOW_BASE_URL}
+    api_key: ${AIRT_DIFY_CHATFLOW_API_KEY}
+    response_mode: streaming
+    capture_tool_calls: true
+  airt_dify_text:
+    provider: dify
+    app_type: chat
+    base_url: ${AIRT_DIFY_TEXT_BASE_URL}
+    api_key: ${AIRT_DIFY_TEXT_API_KEY}
+    response_mode: blocking
+  airt_dify_chatflow:
+    provider: dify
+    app_type: advanced-chat
+    base_url: ${AIRT_DIFY_CHATFLOW_BASE_URL}
+    api_key: ${AIRT_DIFY_CHATFLOW_API_KEY}
+    response_mode: streaming
+    capture_tool_calls: true
+
+
+
