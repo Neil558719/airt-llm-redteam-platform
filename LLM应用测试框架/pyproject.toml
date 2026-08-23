@@ -19,6 +19,7 @@ classifiers = [
 dependencies = [
     "pytest>=7.0",
     "jsonschema>=4.0",
+    "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -44,3 +45,5 @@ include = ["llmtest*"]
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-ra"
+
+
