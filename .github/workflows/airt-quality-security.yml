@@ -48,7 +48,7 @@ jobs:
           python-version: '3.14'
       - run: python -m venv .venv
       - run: .venv/bin/python -m pip install -e .
-      - run: ../.venv/bin/python -m pytest -q tests/test_shared_quality.py tests/test_shared_cases.py tests/test_unified_results.py
+      - run: .venv/bin/python -m pytest -q tests/test_shared_quality.py tests/test_shared_cases.py tests/test_unified_results.py
 
   live-chatflow-security:
     if: ${{ inputs.run_live == true }}
@@ -130,6 +130,7 @@ jobs:
           fi
       - name: Run unified gate
         run: .venv/bin/python scripts/unified_gate.py --results LLM应用测试框架/reports/evaluation-result-v1.jsonl --min-quality-pass-rate 1.0 --max-latency-ms 5000
+
 
 
 
