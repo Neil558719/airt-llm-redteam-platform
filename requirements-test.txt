@@ -1,0 +1,4 @@
+# Only needed for local/offline regression tests.
+# Install with: python -m pip install -e ".[test]"
+pytest==9.1.1
+pytest-asyncio==1.4.0

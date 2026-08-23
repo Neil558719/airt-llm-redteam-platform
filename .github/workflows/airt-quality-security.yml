@@ -1,0 +1,127 @@
+name: Airt unified quality and security checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m venv .venv
+      - run: .venv/bin/python -m pip install -e '.[test]'
+      - run: .venv/bin/python -m pytest -q
+      - run: .venv/bin/python verify_migration.py
+      - name: Validate shared cases
+        run: .venv/bin/airt cases validate shared_cases/unified_chatflow.yaml
+      - name: Generate offline report dashboard
+        run: |
+          .venv/bin/airt trend --reports reports/quality
+          .venv/bin/airt dashboard --reports reports --out artifacts
+      - name: Upload offline artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: airt-offline-reports
+          path: |
+            reports/
+            artifacts/
+
+  shared-quality:
+    runs-on: ubuntu-latest
+    needs: offline
+    defaults:
+      run:
+        working-directory: LLM应用测试框架
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m venv .venv
+      - run: .venv/bin/python -m pip install -e .
+      - run: ../.venv/bin/python -m pytest -q tests/test_shared_quality.py tests/test_shared_cases.py tests/test_unified_results.py
+
+  live-chatflow-security:
+    if: ${{ secrets.DIFY_AGENT_API_KEY != '' && secrets.JUDGE_API_KEY != '' }}
+    runs-on: ubuntu-latest
+    needs: offline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m venv .venv
+      - run: .venv/bin/python -m pip install -e '.[test]'
+      - name: Run Chatflow security
+        run: .venv/bin/airt chatflow security --out runs/ci-chatflow
+        env:
+          DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
+          JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
+          JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
+          JUDGE_MODEL: ${{ secrets.JUDGE_MODEL }}
+      - name: Generate security trend and dashboard
+        run: |
+          .venv/bin/airt trend --reports reports/security
+          .venv/bin/airt dashboard --reports reports --out artifacts/security
+      - name: Upload security artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: airt-chatflow-security
+          path: |
+            reports/security/
+            artifacts/security/
+
+  live-chatflow-quality:
+    if: ${{ secrets.DIFY_AGENT_API_KEY != '' && secrets.JUDGE_API_KEY != '' }}
+    runs-on: ubuntu-latest
+    needs: [offline, shared-quality]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m venv .venv
+      - run: .venv/bin/python -m pip install -e '.[test]'
+      - name: Run Chatflow quality
+        run: .venv/bin/airt chatflow quality --out runs/ci-chatflow-quality
+        env:
+          DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
+          JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
+          JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
+          JUDGE_MODEL: ${{ secrets.JUDGE_MODEL }}
+      - name: Generate quality trend and dashboard
+        run: |
+          .venv/bin/airt trend --reports reports/quality
+          .venv/bin/airt dashboard --reports reports --out artifacts/quality
+      - name: Upload quality artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: airt-chatflow-quality
+          path: |
+            reports/quality/
+            artifacts/quality/
+
+  unified-gate:
+    if: ${{ secrets.DIFY_AGENT_API_KEY != '' && secrets.JUDGE_API_KEY != '' && needs.offline.result == 'success' && needs.shared-quality.result == 'success' && needs.live-chatflow-security.result == 'success' && needs.live-chatflow-quality.result == 'success' }}
+    runs-on: ubuntu-latest
+    needs: [offline, shared-quality, live-chatflow-security, live-chatflow-quality]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m venv .venv
+      - run: .venv/bin/python -m pip install -e '.[test]'
+      - name: Ensure offline quality result exists
+        shell: bash
+        run: |
+          mkdir -p LLM应用测试框架/reports
+          if [ ! -f LLM应用测试框架/reports/evaluation-result-v1.jsonl ]; then
+            printf '%s\n' '{"schema_version":"evaluation-result-v1","runner":"pytest","target":"unified_dify_chatflow","case_id":"ci-quality-placeholder","category":"quality","status":"skipped","scores":{},"latency_ms":null}' > LLM应用测试框架/reports/evaluation-result-v1.jsonl
+          fi
+      - name: Run unified gate
+        run: .venv/bin/python scripts/unified_gate.py --results LLM应用测试框架/reports/evaluation-result-v1.jsonl --min-quality-pass-rate 1.0 --max-latency-ms 5000

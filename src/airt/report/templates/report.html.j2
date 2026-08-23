@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI 红队测试报告</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f7f8fa;
+        --panel: #ffffff;
+        --ink: #182230;
+        --muted: #5d6878;
+        --line: #d9dee7;
+        --accent: #175cd3;
+        --danger: #c4320a;
+        --bar: #2e90fa;
+        --shadow: 0 1px 3px rgba(16, 24, 40, .10);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #101828;
+          --panel: #182230;
+          --ink: #f2f4f7;
+          --muted: #b4bdc9;
+          --line: #344054;
+          --accent: #84adff;
+          --danger: #f97066;
+          --bar: #53b1fd;
+          --shadow: 0 1px 3px rgba(0, 0, 0, .35);
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 2rem;
+        background: var(--bg);
+        color: var(--ink);
+        font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main { max-width: 1180px; margin: 0 auto; }
+      h1, h2, h3 { line-height: 1.2; }
+      h1 { margin: 0; font-size: clamp(1.8rem, 4vw, 2.6rem); }
+      h2 { margin-top: 2rem; font-size: 1.25rem; }
+      h3 { margin: 0; font-size: 1rem; }
+      .lede, .case-meta, .empty { color: var(--muted); }
+      .lede { margin: .45rem 0 1.5rem; }
+      .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: .75rem; }
+      .metric, .panel, .case-card, .metadata { background: var(--panel); border: 1px solid var(--line); border-radius: .6rem; box-shadow: var(--shadow); }
+      .metric { padding: 1rem; }
+      .metric dt { color: var(--muted); font-size: .82rem; }
+      .metric dd { margin: .2rem 0 0; font-size: 1.4rem; font-weight: 700; }
+      .metric dd small { color: var(--muted); font-size: .78rem; font-weight: 500; }
+      .metadata { margin: 1rem 0; padding: 1rem; }
+      .metadata h2 { margin: 0 0 .5rem; font-size: 1rem; }
+      .metadata dl { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; margin: 0; }
+      .metadata dt { color: var(--muted); font-weight: 600; }
+      .metadata dd { margin: 0; }
+      .notice { margin-top: 1rem; padding: .8rem 1rem; border-left: .25rem solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+      .panel { padding: 1rem; overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: .65rem .55rem; text-align: left; border-bottom: 1px solid var(--line); }
+      th { color: var(--muted); font-size: .8rem; letter-spacing: .03em; }
+      tr:last-child td { border-bottom: 0; }
+      .category-chart { list-style: none; padding: 0; margin: 0; display: grid; gap: .7rem; }
+      .category-row { display: grid; grid-template-columns: minmax(10rem, 18rem) 1fr 4rem; gap: .7rem; align-items: center; }
+      .category-name { overflow-wrap: anywhere; }
+      .bar-track { height: .85rem; border-radius: 99px; background: var(--line); overflow: hidden; }
+      .bar-fill { display: block; height: 100%; border-radius: inherit; background: var(--bar); min-width: 2px; }
+      .bar-label { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .controls { display: flex; gap: .65rem; align-items: center; flex-wrap: wrap; margin: 1rem 0; }
+      select { color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: .35rem; padding: .4rem .55rem; }
+      .case-list { display: grid; gap: .8rem; }
+      .case-card { padding: 1rem; }
+      .case-card[data-outcome="success"] { border-left: .3rem solid var(--danger); }
+      .case-header { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+      .badge { display: inline-block; border: 1px solid var(--line); border-radius: 99px; padding: .1rem .5rem; font-size: .75rem; }
+      details { margin-top: .7rem; border-top: 1px solid var(--line); padding-top: .65rem; }
+      summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+      .content { margin: .55rem 0 0; padding: .75rem; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: color-mix(in srgb, var(--line) 25%, var(--panel)); border-radius: .35rem; }
+      .message + .message { margin-top: .8rem; }
+      .message-label, .verdict-label { display: block; margin-bottom: .2rem; color: var(--muted); font-size: .86rem; font-weight: 600; }
+      .verdict-list { display: grid; grid-template-columns: max-content 1fr; gap: .3rem .75rem; margin: .55rem 0 0; }
+      .verdict-list dt { color: var(--muted); font-weight: 600; }
+      .verdict-list dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+      @media (max-width: 650px) {
+        body { padding: 1rem; }
+        .category-row { grid-template-columns: 1fr 3.5rem; }
+        .category-row .bar-track { grid-column: 1 / -1; grid-row: 2; }
+        .category-row .bar-label { grid-column: 2; grid-row: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>AI 红队测试报告</h1>
+        <p class="lede">本报告汇总本次已记录的测试用例、判定结果与风险指标。</p>
+        <section class="metadata" aria-labelledby="metadata-heading">
+          <h2 id="metadata-heading">运行信息</h2>
+          <dl><dt>测试类型</dt><dd>{{ metadata.test_type }}</dd><dt>测试方式</dt><dd>{{ metadata.test_method }}</dd><dt>测试对象模式</dt><dd>{{ metadata.target_profile }}</dd><dt>运行模式</dt><dd>{{ metadata.run_mode }}</dd><dt>安全 Judge 策略</dt><dd>{{ metadata.security_judge_policy }}（实际调用：{{ metadata.security_judge_used }}）</dd><dt>质量 Judge 模式</dt><dd>{{ metadata.quality_judge_mode }}（实际调用：{{ metadata.quality_judge_used }}）</dd></dl>
+        </section>
+      </header>
+
+      <section aria-labelledby="summary-heading">
+        <h2 id="summary-heading">汇总概览</h2>
+        <dl class="summary-grid">
+          <div class="metric"><dt>攻击成功率（ASR）</dt><dd>{{ asr_percent }} <small>({{ summary.success }}/{{ asr_denominator }})</small></dd></div>
+          <div class="metric"><dt>攻击成功用例</dt><dd>{{ summary.success }}</dd></div>
+          <div class="metric"><dt>攻击未成功用例</dt><dd>{{ summary.fail }}</dd></div>
+          <div class="metric"><dt>结论不确定</dt><dd>{{ summary.uncertain }}</dd></div>
+          <div class="metric"><dt>执行异常</dt><dd>{{ summary.error }}</dd></div>
+          <div class="metric"><dt>风险分</dt><dd>{{ risk_score }}</dd></div>
+        </dl>
+        <p class="notice" role="note">攻击成功率 = 攻击成功 /（攻击成功 + 攻击未成功）。结论不确定和执行异常不计入攻击成功率分母，并单独展示。</p>
+      </section>
+
+      {% if quality %}
+      <section aria-labelledby="quality-heading">
+        <h2 id="quality-heading">质量评测</h2>
+        <dl class="summary-grid">
+          <div class="metric"><dt>质量通过率</dt><dd>{{ "%.1f"|format(quality.pass_rate * 100) }}%</dd></div>
+          <div class="metric"><dt>质量用例</dt><dd>{{ quality.passed }}/{{ quality.total }}</dd></div>
+          <div class="metric"><dt>语义匹配平均分</dt><dd>{% if quality.semantic_score is not none %}{{ "%.3f"|format(quality.semantic_score) }}{% else %}—{% endif %}</dd></div>
+          <div class="metric"><dt>平均幻觉率</dt><dd>{% if quality.hallucination_rate is not none %}{{ "%.1f"|format(quality.hallucination_rate * 100) }}%{% else %}—{% endif %}</dd></div>
+          <div class="metric"><dt>平均响应延迟</dt><dd>{% if quality.average_latency_ms is not none %}{{ "%.0f"|format(quality.average_latency_ms) }} ms{% else %}—{% endif %}</dd></div>
+        </dl>
+      </section>
+      {% endif %}
+
+      <section aria-labelledby="categories-heading">
+        <h2 id="categories-heading">各攻击类别成功率</h2>
+        {% if category_rows %}
+        <ol class="category-chart" aria-label="各攻击类别成功率">
+          {% for row in category_rows %}
+          <li class="category-row">
+            <span class="category-name">{{ row.name }}</span>
+            <span class="bar-track" aria-hidden="true"><span class="bar-fill" style="width: {{ row.width }}%"></span></span>
+            <span class="bar-label">{{ row.percent }}</span>
+          </li>
+          {% endfor %}
+        </ol>
+        {% else %}<p class="empty">暂无类别数据。</p>{% endif %}
+      </section>
+
+      <section aria-labelledby="table-heading">
+        <h2 id="table-heading">按类别汇总</h2>
+        <div class="panel">
+          <table>
+            <thead><tr><th>攻击类别</th><th>攻击成功率</th><th>攻击成功</th><th>攻击未成功</th><th>结论不确定</th><th>执行异常</th><th>总计</th></tr></thead>
+            <tbody>
+              {% for row in category_rows %}
+              <tr><td>{{ row.name }}</td><td>{{ row.percent }}</td><td>{{ row.success }}</td><td>{{ row.fail }}</td><td>{{ row.uncertain }}</td><td>{{ row.error }}</td><td>{{ row.total }}</td></tr>
+              {% else %}<tr><td colspan="7" class="empty">暂无类别数据。</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section aria-labelledby="cases-heading">
+        <h2 id="cases-heading">用例详情</h2>
+        <div class="controls">
+          <label for="severity-filter">按严重级别筛选</label>
+          <select id="severity-filter" class="severity-filter">
+            <option value="all">全部严重级别</option>
+            {% for severity in severities %}<option value="{{ severity.value }}">{{ severity.label }}</option>{% endfor %}
+          </select>
+          <span id="case-count" class="case-meta" aria-live="polite"></span>
+        </div>
+        <div class="case-list" id="case-list">
+          {% for result in case_rows %}
+          <article class="case-card" data-severity="{{ result.severity }}" data-outcome="{{ result.outcome }}">
+            <div class="case-header">
+              <h3>{{ result.case_id }} — {{ result.name }}</h3>
+              <div class="case-meta"><span class="badge">{{ result.severity }}</span> <span class="badge">{{ result.outcome_label }}</span> <span>{{ result.category }}</span></div>
+            </div>
+            <div class="case-meta">响应耗时：{{ result.latency }}</div>
+            <details>
+              <summary>测试请求</summary>
+              {% for request in result.requests %}
+              <div class="message"><span class="message-label">第 {{ request.round }} 轮测试请求</span><div class="content">{{ request.content }}</div></div>
+              {% else %}<p class="empty">未记录测试请求。</p>{% endfor %}
+              {% if result.context_messages %}
+              <div class="message"><span class="message-label">多轮对话上下文</span>{% for message in result.context_messages %}<div class="content">{{ message.content }}</div>{% endfor %}</div>
+              {% endif %}
+            </details>
+            <details>
+              <summary>模型回复</summary>
+              <div class="content">{{ result.reply }}</div>
+            </details>
+            <details>
+              <summary>工具调用观测</summary>
+              {% if result.tool_calls %}
+              {% for call in result.tool_calls %}
+              <div class="message"><span class="message-label">工具：{{ call.name }}｜状态：{{ call.status }}｜提供方：{{ call.provider }}</span><div class="content">参数：{{ call.arguments }}
+结果：{{ call.result }}</div></div>
+              {% endfor %}
+              {% else %}<p class="empty">本用例未记录工具调用。</p>{% endif %}
+            </details>
+            <details>
+              <summary>判定结论</summary>
+              {% if result.error %}
+              <dl class="verdict-list"><dt>结论</dt><dd>{{ result.outcome_label }}</dd><dt>异常信息</dt><dd>{{ result.error }}</dd></dl>
+              {% elif result.verdict %}
+              <dl class="verdict-list"><dt>结论</dt><dd>{{ result.verdict.outcome }}</dd><dt>判定方式</dt><dd>{{ result.verdict.source }}</dd><dt>置信度</dt><dd>{{ result.verdict.confidence }}</dd><dt>判定说明</dt><dd>{{ result.verdict.reason }}</dd></dl>
+              {% else %}<p class="empty">未记录判定结论。</p>{% endif %}
+            </details>
+          </article>
+          {% else %}<p class="empty">暂无用例结果。</p>{% endfor %}
+        </div>
+      </section>
+    </main>
+    <script>
+      (() => {
+        const filter = document.getElementById('severity-filter');
+        const cards = Array.from(document.querySelectorAll('.case-card'));
+        const count = document.getElementById('case-count');
+        const apply = () => {
+          const severity = filter.value;
+          let visible = 0;
+          cards.forEach((card) => {
+            const show = severity === 'all' || card.dataset.severity === severity;
+            card.hidden = !show;
+            if (show) visible += 1;
+          });
+          count.textContent = `当前显示 ${visible} 个用例`;
+        };
+        filter.addEventListener('change', apply);
+        apply();
+      })();
+    </script>
+  </body>
+</html>
