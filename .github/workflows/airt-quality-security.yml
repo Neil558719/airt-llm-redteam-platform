@@ -24,6 +24,7 @@ jobs:
         run: .venv/bin/airt cases validate shared_cases/unified_chatflow.yaml
       - name: Generate offline report dashboard
         run: |
+          mkdir -p reports/assess reports/security reports/quality reports/release
           .venv/bin/airt trend --reports reports/quality
           .venv/bin/airt dashboard --reports reports --out artifacts
       - name: Upload offline artifacts
@@ -129,6 +130,7 @@ jobs:
           fi
       - name: Run unified gate
         run: .venv/bin/python scripts/unified_gate.py --results LLM应用测试框架/reports/evaluation-result-v1.jsonl --min-quality-pass-rate 1.0 --max-latency-ms 5000
+
 
 
 
