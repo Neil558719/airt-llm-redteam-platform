@@ -1,3 +1,5 @@
+name: Airt unified quality and security checks
+
 on:
   push:
   pull_request:
