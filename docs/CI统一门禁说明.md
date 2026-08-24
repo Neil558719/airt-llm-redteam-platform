@@ -10,10 +10,13 @@
 必需的 GitHub Secrets：
 
 ```text
+DIFY_BASE_URL
 DIFY_AGENT_API_KEY
 JUDGE_BASE_URL
 JUDGE_API_KEY
 JUDGE_MODEL
 ```
 
-未配置 live secrets 时，Chatflow live job 会跳过；这不等于安全测试通过。发布分支若要求真实安全门禁，必须配置这些 secrets，并将 `live-chatflow-security` 设为 required check。
+`DIFY_BASE_URL` 必须是 GitHub Actions runner 可以访问的 Dify API 地址，并包含 `/v1`，例如 `https://dify.example.com/v1`。不能填写本机的 `localhost` 或 `127.0.0.1`：GitHub runner 不在你的电脑上，无法访问本机 Docker Dify。
+
+手动运行工作流时勾选 `run_live=true`，工作流会把该地址注入临时 CI 配置。未配置 live secrets 时，Chatflow live job 会跳过；这不等于安全测试通过。发布分支若要求真实安全门禁，必须配置这些 secrets，并将 `live-chatflow-security` 设为 required check。
