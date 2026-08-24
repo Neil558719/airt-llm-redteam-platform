@@ -140,3 +140,5 @@ python -m pytest -m live -q
 ```
 
 GitHub Actions 会自动运行测试、校验共享用例，并将报告和 Dashboard 上传为构建 artifact。
+
+启用 GitHub Actions 的实时 Chatflow 测试还需要配置 `DIFY_BASE_URL`。它必须是 GitHub runner 可访问的 Dify API 地址（带 `/v1`）；本机 Docker 地址 `http://127.0.0.1/v1` 只能用于本地运行，不能用于 GitHub runner。
