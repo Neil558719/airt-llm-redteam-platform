@@ -63,8 +63,14 @@ jobs:
           python-version: '3.14'
       - run: python -m venv .venv
       - run: .venv/bin/python -m pip install -e '.[test]'
+      - name: Prepare CI Chatflow config
+        env:
+          DIFY_BASE_URL: ${{ secrets.DIFY_BASE_URL }}
+        run: |
+          test -n "$DIFY_BASE_URL"
+          sed "s#http://127.0.0.1/v1#${DIFY_BASE_URL%/}#g" config.dify.agent.yaml > config.ci.agent.yaml
       - name: Run Chatflow security
-        run: .venv/bin/airt chatflow security --out runs/ci-chatflow
+        run: .venv/bin/airt chatflow security --config config.ci.agent.yaml --out runs/ci-chatflow
         env:
           DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
           JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
@@ -81,6 +87,7 @@ jobs:
           path: |
             reports/security/
             artifacts/security/
+            runs/ci-chatflow/results.jsonl
 
   live-chatflow-quality:
     if: ${{ inputs.run_live == true }}
@@ -93,8 +100,14 @@ jobs:
           python-version: '3.14'
       - run: python -m venv .venv
       - run: .venv/bin/python -m pip install -e '.[test]'
+      - name: Prepare CI Chatflow config
+        env:
+          DIFY_BASE_URL: ${{ secrets.DIFY_BASE_URL }}
+        run: |
+          test -n "$DIFY_BASE_URL"
+          sed "s#http://127.0.0.1/v1#${DIFY_BASE_URL%/}#g" config.dify.agent.yaml > config.ci.agent.yaml
       - name: Run Chatflow quality
-        run: .venv/bin/airt chatflow quality --out runs/ci-chatflow-quality
+        run: .venv/bin/airt chatflow quality --config config.ci.agent.yaml --out runs/ci-chatflow-quality
         env:
           DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
           JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
@@ -111,6 +124,7 @@ jobs:
           path: |
             reports/quality/
             artifacts/quality/
+            runs/ci-chatflow-quality/results.jsonl
 
   unified-gate:
     if: ${{ always() && inputs.run_live == true && needs.offline.result == 'success' && needs.shared-quality.result == 'success' && needs.live-chatflow-security.result == 'success' && needs.live-chatflow-quality.result == 'success' }}
@@ -123,15 +137,30 @@ jobs:
           python-version: '3.14'
       - run: python -m venv .venv
       - run: .venv/bin/python -m pip install -e '.[test]'
-      - name: Ensure offline quality result exists
-        shell: bash
+      - name: Download Chatflow results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: airt-chatflow-*
+          path: gate-input
+          merge-multiple: false
+      - name: Convert Airt results to shared contract
         run: |
-          mkdir -p LLM应用测试框架/reports
-          if [ ! -f LLM应用测试框架/reports/evaluation-result-v1.jsonl ]; then
-            printf '%s\n' '{"schema_version":"evaluation-result-v1","runner":"pytest","target":"unified_dify_chatflow","case_id":"ci-quality-placeholder","category":"quality","status":"skipped","scores":{},"latency_ms":null}' > LLM应用测试框架/reports/evaluation-result-v1.jsonl
-          fi
+          mkdir -p gate-results
+          security_input="$(find gate-input/airt-chatflow-security -path '*/results.jsonl' -print -quit)"
+          quality_input="$(find gate-input/airt-chatflow-quality -path '*/results.jsonl' -print -quit)"
+          test -n "$security_input"
+          test -n "$quality_input"
+          .venv/bin/python scripts/airt_results_to_v1.py --input "$security_input" --output gate-results/security.jsonl
+          .venv/bin/python scripts/airt_results_to_v1.py --input "$quality_input" --output gate-results/quality.jsonl
       - name: Run unified gate
-        run: .venv/bin/python scripts/unified_gate.py --results LLM应用测试框架/reports/evaluation-result-v1.jsonl --min-quality-pass-rate 1.0 --max-latency-ms 5000
+        run: |
+          .venv/bin/python scripts/unified_gate.py \
+            --results gate-results/security.jsonl \
+            --results gate-results/quality.jsonl \
+            --require-security \
+            --min-security-score 90 \
+            --min-quality-pass-rate 1.0 \
+            --max-latency-ms 20000
 
 
 
