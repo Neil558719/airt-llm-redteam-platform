@@ -189,7 +189,6 @@ async def run_cases(
                 raise RuntimeError(f"could not write result JSONL {output_path}") from error
 
     async def execute(case: AttackCase) -> CaseResult:
-        started = time.monotonic()
         messages: list[Message] = []
         if system_prompt:
             messages.append(Message(role="system", content=system_prompt))
@@ -198,7 +197,12 @@ async def run_cases(
         error: Exception | None = None
         failure_kind: str | None = None
         stage = 'target'
+        started: float | None = None
+        target_latency_ms: float | None = None
         async with semaphore:
+            # Measure the target interaction only. Queueing for another worker
+            # and evaluator latency are harness overhead, not target latency.
+            started = time.monotonic()
             try:
                 for turn in case.turns:
                     messages.append(Message(role="user", content=turn))
@@ -218,6 +222,7 @@ async def run_cases(
                 error = caught
                 failure_kind = stage
 
+            target_latency_ms = (time.monotonic() - started) * 1000
             if error is None:
                 if final_reply is None:
                     error = RuntimeError("target returned no reply")
@@ -233,12 +238,12 @@ async def run_cases(
                     else:
                         stage = 'quality'
                         quality_payload = (
-                            await async_quality_evaluator(case, final_reply, (time.monotonic() - started) * 1000)
+                            await async_quality_evaluator(case, final_reply, target_latency_ms)
                             if async_quality_evaluator is not None
                             else quality_evaluator.evaluate(
                                 EvaluationContext.from_reply(
                                     final_reply,
-                                    latency_ms=(time.monotonic() - started) * 1000,
+                                    latency_ms=target_latency_ms,
                                 ),
                                 expected_answer=case.quality.expected_answer,
                                 semantic_threshold=case.quality.semantic_threshold,
@@ -256,7 +261,7 @@ async def run_cases(
                             messages=messages,
                             reply=final_reply,
                             verdict=verdict,
-                            latency_ms=(time.monotonic() - started) * 1000,
+                            latency_ms=target_latency_ms,
                             usage=final_reply.usage,
                             quality=quality_payload,
                             security_judge_used=getattr(verdict, "source", None) == "judge",
@@ -274,7 +279,7 @@ async def run_cases(
                 reply=final_reply,
                 verdict=None,
                 error=_format_error(error),
-                latency_ms=(time.monotonic() - started) * 1000,
+                latency_ms=target_latency_ms,
                 usage=final_reply.usage if final_reply is not None else {},
                 failure_kind=failure_kind or 'platform',
             )

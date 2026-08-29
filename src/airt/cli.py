@@ -32,7 +32,7 @@ from airt.judge.llm import Judge
 from airt.judge.llm import build_judge
 from airt.judge.pipeline import evaluate
 from airt.metrics import summarize
-from airt.models import CaseResult, ResultStatus, RunMetadata, Severity
+from airt.models import CaseResult, Reply, ResultStatus, RunMetadata, Severity
 from airt.quality_bridge import LiveQualityJudge, QualityEvaluator, QualitySummary
 from airt.target_registry import load_target_registry
 from airt.shared_cases import SharedCaseError, shared_quality_attack_cases, shared_security_cases
@@ -56,6 +56,12 @@ def release_gate_failures(
         if quality.average_latency_ms > max_average_latency_ms:
             failures.append(f"average latency {quality.average_latency_ms:.0f} ms > maximum {max_average_latency_ms:.0f} ms")
     return failures
+
+
+def _quality_judge_context(reply: Reply) -> str:
+    """Return the retrieved evidence available to the quality Judge."""
+
+    return "\n".join(source.strip() for source in reply.sources if source.strip())
 from airt.report.archive import archive_reports
 from airt.report.unified import write_assess_report, write_unified_report
 from airt.report.trends import write_trend
@@ -647,7 +653,7 @@ async def _execute_run(
             judged = await quality_judge.evaluate(
                 case.turns[-1], reply.text,
                 case.quality.expected_answer if case.quality and case.quality.expected_answer else "回答是否准确、相关、完整",
-                context="\n".join([]),
+                context=_quality_judge_context(reply),
             )
             offline.judge_score = judged.score
             offline.judge_passed = judged.passed

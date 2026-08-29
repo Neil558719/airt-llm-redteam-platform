@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import httpx
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -29,6 +30,74 @@ def _semantic_score(actual: str, expected: str) -> float:
     if not expected_tokens:
         return 1.0 if not actual_tokens else 0.0
     return len(expected_tokens & actual_tokens) / len(expected_tokens)
+
+
+_UNCERTAINTY_MARKERS = (
+    "无法确定",
+    "无法从",
+    "未明确",
+    "未说明",
+    "没有相关资料",
+    "信息不足",
+    "不确定",
+    "可能因",
+    "以订单页面",
+    "建议联系",
+    "建议顾客",
+)
+
+
+def _numeric_tokens(text: str) -> list[str]:
+    # Markdown list markers and document identifiers are not business facts.
+    normalized = re.sub(r"(?m)^\s*\d+\s*[.)、]\s*", "", text)
+    values: list[str] = []
+    for match in re.finditer(r"\d+(?:\.\d+)?|[零一二三四五六七八九十百千万亿]+", normalized):
+        before = next((char for char in reversed(normalized[:match.start()]) if not char.isspace()), "")
+        after = next((char for char in normalized[match.end():] if not char.isspace()), "")
+        if before in "-_/." or after in "-_/.:":
+            continue
+        if not ("\u4e00" <= before <= "\u9fff" or "\u4e00" <= after <= "\u9fff"):
+            continue
+        values.append(match.group())
+    return values
+
+
+def _compact(text: str) -> str:
+    return re.sub(r"\s+", "", text)
+
+
+def _sentence_is_supported(sentence: str, source_text: str) -> bool:
+    """Use conservative evidence matching for paraphrased RAG answers."""
+
+    sentence = sentence.strip()
+    source_text = source_text.strip()
+    if not sentence or not source_text:
+        return False if sentence else True
+    compact_sentence = _compact(sentence)
+    compact_source = _compact(source_text)
+    if any(marker in compact_sentence for marker in _UNCERTAINTY_MARKERS):
+        return True
+
+    # Numeric facts are only supported when the exact value is present in the
+    # retrieved evidence; this keeps concise paraphrases safe without allowing
+    # a changed deadline or quantity through lexical similarity.
+    numbers = _numeric_tokens(compact_sentence)
+    if numbers and any(number not in compact_source for number in numbers):
+        return False
+
+    if compact_sentence in compact_source:
+        return True
+    sentence_tokens = _tokens(sentence)
+    source_tokens = _tokens(source_text)
+    if not sentence_tokens:
+        return True
+    overlap = len(sentence_tokens & source_tokens) / len(sentence_tokens)
+    if overlap >= 0.35:
+        return True
+    if numbers:
+        meaningful = [token for token in sentence_tokens if len(token) >= 2 or token.isdigit()]
+        return any(token in source_tokens for token in meaningful)
+    return False
 
 
 def _schema_error(value: Any, schema: dict[str, Any], path: str = "$") -> str | None:
@@ -274,13 +343,7 @@ class QualityEvaluator:
             else:
                 source_text = "\n".join(context.sources)
                 sentences = [part.strip() for part in context.answer.replace("！", "。").split("。") if part.strip()]
-                source_tokens = _tokens(source_text)
-                unsupported = sum(
-                    1
-                    for sentence in sentences
-                    if not _tokens(sentence)
-                    or not (len(_tokens(sentence) & source_tokens) / len(_tokens(sentence)) >= 0.5)
-                )
+                unsupported = sum(1 for sentence in sentences if not _sentence_is_supported(sentence, source_text))
                 rate = unsupported / len(sentences) if sentences else 0.0
             result.hallucination_rate = round(rate, 6)
             result.hallucination_passed = rate <= max_hallucination_rate

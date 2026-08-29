@@ -12,7 +12,7 @@ from airt.adapter import OpenAICompatTarget
 from airt.cli import app, build_target
 from airt.config import DifyTargetConfig, TargetConfig
 from airt.dify_adapter import DifyTarget
-from airt.models import AttackCase, CaseResult, RunMetadata, Verdict
+from airt.models import AttackCase, CaseResult, Reply, RunMetadata, Verdict
 
 
 runner = CliRunner()
@@ -55,6 +55,12 @@ def test_run_mode_rejects_unknown_value():
 
 def test_run_mode_explicit_security_override_wins():
     assert cli._resolve_run_mode("security", security_judge="off") == ("off", "offline")
+
+
+def test_quality_judge_context_uses_retrieved_sources():
+    reply = Reply(text="回答", sources=["知识库片段一", "知识库片段二"])
+
+    assert cli._quality_judge_context(reply) == "知识库片段一\n知识库片段二"
 
 
 

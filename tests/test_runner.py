@@ -278,6 +278,56 @@ async def test_qps_limiter_is_shared_by_workers(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_case_latency_excludes_waiting_for_another_case_slot(tmp_path):
+    class FirstCaseSlowTarget(FakeTarget):
+        async def chat(self, messages):
+            case_id = next(message.content for message in reversed(messages) if message.role == "user")
+            if case_id == "slow":
+                await asyncio.sleep(0.15)
+            return await super().chat(messages)
+
+    target = FirstCaseSlowTarget({"slow": "PASS", "fast": "PASS"})
+    results = await run_cases(
+        [make_case("slow", "slow"), make_case("fast", "fast")],
+        target,
+        FakeEvaluator(),
+        tmp_path / "results.jsonl",
+        concurrency=1,
+        qps=None,
+        retries=0,
+        resume=False,
+    )
+
+    assert results[1].latency_ms is not None
+    assert results[0].latency_ms is not None
+    assert results[1].latency_ms < results[0].latency_ms * 0.5
+
+
+@pytest.mark.asyncio
+async def test_case_latency_excludes_evaluator_time(tmp_path):
+    class SlowEvaluator(FakeEvaluator):
+        async def evaluate(self, case, reply):
+            await asyncio.sleep(0.15)
+            return await super().evaluate(case, reply)
+
+    result = (
+        await run_cases(
+            [make_case("fast", "fast")],
+            FakeTarget({"fast": "PASS"}),
+            SlowEvaluator(),
+            tmp_path / "results.jsonl",
+            concurrency=1,
+            qps=None,
+            retries=0,
+            resume=False,
+        )
+    )[0]
+
+    assert result.latency_ms is not None
+    assert result.latency_ms < 100
+
+
+@pytest.mark.asyncio
 async def test_concurrency_is_bounded_across_cases(tmp_path):
     class BlockingTarget(FakeTarget):
         def __init__(self):
