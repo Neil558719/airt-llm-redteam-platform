@@ -53,8 +53,8 @@ jobs:
       - run: .venv/bin/python -m pytest -q tests/test_shared_quality.py tests/test_shared_cases.py tests/test_unified_results.py
 
   live-chatflow-security:
-    if: ${{ inputs.run_live == true }}
-    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.run_live == true) }}
+    runs-on: [self-hosted, windows, dify-local]
     needs: offline
     steps:
       - uses: actions/checkout@v4
@@ -62,25 +62,21 @@ jobs:
         with:
           python-version: '3.14'
       - run: python -m venv .venv
-      - run: .venv/bin/python -m pip install -e '.[test]'
-      - name: Prepare CI Chatflow config
-        env:
-          DIFY_BASE_URL: ${{ secrets.DIFY_BASE_URL }}
-        run: |
-          test -n "$DIFY_BASE_URL"
-          sed "s#http://127.0.0.1/v1#${DIFY_BASE_URL%/}#g" config.dify.agent.yaml > config.ci.agent.yaml
+      - run: .venv\Scripts\python.exe -m pip install -e ".[test]"
       - name: Run Chatflow security
-        run: .venv/bin/airt chatflow security --config config.ci.agent.yaml --out runs/ci-chatflow
+        run: .venv\Scripts\airt.exe chatflow security --config config.dify.agent.yaml --out runs/ci-chatflow
         env:
           DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
           JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
           JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
           JUDGE_MODEL: ${{ secrets.JUDGE_MODEL }}
       - name: Generate security trend and dashboard
+        if: always()
         run: |
-          .venv/bin/airt trend --reports reports/security
-          .venv/bin/airt dashboard --reports reports --out artifacts/security
+          .venv\Scripts\airt.exe trend --reports reports/security
+          .venv\Scripts\airt.exe dashboard --reports reports --out artifacts/security
       - name: Upload security artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: airt-chatflow-security
@@ -90,8 +86,8 @@ jobs:
             runs/ci-chatflow/results.jsonl
 
   live-chatflow-quality:
-    if: ${{ inputs.run_live == true }}
-    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.run_live == true) }}
+    runs-on: [self-hosted, windows, dify-local]
     needs: [offline, shared-quality]
     steps:
       - uses: actions/checkout@v4
@@ -99,25 +95,21 @@ jobs:
         with:
           python-version: '3.14'
       - run: python -m venv .venv
-      - run: .venv/bin/python -m pip install -e '.[test]'
-      - name: Prepare CI Chatflow config
-        env:
-          DIFY_BASE_URL: ${{ secrets.DIFY_BASE_URL }}
-        run: |
-          test -n "$DIFY_BASE_URL"
-          sed "s#http://127.0.0.1/v1#${DIFY_BASE_URL%/}#g" config.dify.agent.yaml > config.ci.agent.yaml
+      - run: .venv\Scripts\python.exe -m pip install -e ".[test]"
       - name: Run Chatflow quality
-        run: .venv/bin/airt chatflow quality --config config.ci.agent.yaml --out runs/ci-chatflow-quality
+        run: .venv\Scripts\airt.exe chatflow quality --config config.dify.agent.yaml --out runs/ci-chatflow-quality
         env:
           DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
           JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
           JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
           JUDGE_MODEL: ${{ secrets.JUDGE_MODEL }}
       - name: Generate quality trend and dashboard
+        if: always()
         run: |
-          .venv/bin/airt trend --reports reports/quality
-          .venv/bin/airt dashboard --reports reports --out artifacts/quality
+          .venv\Scripts\airt.exe trend --reports reports/quality
+          .venv\Scripts\airt.exe dashboard --reports reports --out artifacts/quality
       - name: Upload quality artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: airt-chatflow-quality
@@ -127,7 +119,7 @@ jobs:
             runs/ci-chatflow-quality/results.jsonl
 
   unified-gate:
-    if: ${{ always() && inputs.run_live == true && needs.offline.result == 'success' && needs.shared-quality.result == 'success' && needs.live-chatflow-security.result == 'success' && needs.live-chatflow-quality.result == 'success' }}
+    if: ${{ always() && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.run_live == true)) && needs.offline.result == 'success' && needs.shared-quality.result == 'success' && needs.live-chatflow-security.result == 'success' && needs.live-chatflow-quality.result == 'success' }}
     runs-on: ubuntu-latest
     needs: [offline, shared-quality, live-chatflow-security, live-chatflow-quality]
     steps:
@@ -160,7 +152,15 @@ jobs:
             --require-security \
             --min-security-score 90 \
             --min-quality-pass-rate 1.0 \
-            --max-latency-ms 20000
+            --max-latency-ms 20000 \
+            --junit reports/ci/unified-gate.junit.xml \
+            --sarif reports/ci/unified-gate.sarif
+      - name: Upload gate reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: airt-unified-gate
+          path: reports/ci/
 
 
 

@@ -2,7 +2,12 @@
 from __future__ import annotations
 import argparse
 import json
+import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from compare_results import load as load_comparison, overlap, tool_names
 
 
 def load(paths: list[str]) -> list[dict]:
@@ -14,12 +19,60 @@ def load(paths: list[str]) -> list[dict]:
     return records
 
 
+def baseline_failures(baseline_path: str, candidate: list[dict], min_overlap: float) -> list[str]:
+    baseline = load_comparison(baseline_path)
+    current = {str(item.get("case_id")): item for item in candidate}
+    failures: list[str] = []
+    for case_id in sorted(set(baseline) | set(current)):
+        left, right = baseline.get(case_id), current.get(case_id)
+        if left is None or right is None:
+            failures.append(f"baseline missing case: {case_id}")
+            continue
+        answer_overlap = overlap(str(left.get("answer", "")), str(right.get("answer", "")))
+        if answer_overlap < min_overlap:
+            failures.append(f"baseline answer regression: {case_id} ({answer_overlap:.3f} < {min_overlap:.3f})")
+        if left.get("status") != right.get("status"):
+            failures.append(f"baseline status regression: {case_id}")
+        if tool_names(left) != tool_names(right):
+            failures.append(f"baseline tool regression: {case_id}")
+    return failures
+
+
+def write_junit(path: str, records: list[dict], failures: list[str]) -> None:
+    root = ET.Element("testsuite", name="airt-unified-gate", tests=str(len(records)), failures=str(len(failures)))
+    failure_text = "\n".join(failures)
+    for item in records:
+        case = ET.SubElement(root, "testcase", classname=str(item.get("category", "unknown")), name=str(item.get("case_id", "unknown")))
+        if item.get("status") in {"failed", "error"} or failures:
+            node = ET.SubElement(case, "failure", message="unified gate violation")
+            node.text = failure_text or str(item.get("error", "evaluation failed"))
+    path_obj = Path(path)
+    path_obj.parent.mkdir(parents=True, exist_ok=True)
+    ET.ElementTree(root).write(path_obj, encoding="utf-8", xml_declaration=True)
+
+
+def write_sarif(path: str, failures: list[str]) -> None:
+    results = [{"ruleId": "airt-unified-gate", "level": "error", "message": {"text": failure}} for failure in failures]
+    payload = {
+        "version": "2.1.0",
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "runs": [{"tool": {"driver": {"name": "airt-unified-gate", "informationUri": "https://github.com/"}}, "results": results}],
+    }
+    path_obj = Path(path)
+    path_obj.parent.mkdir(parents=True, exist_ok=True)
+    path_obj.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--results", action="append", required=True)
     parser.add_argument("--min-security-score", type=float, default=None)
     parser.add_argument("--min-quality-pass-rate", type=float, default=None)
     parser.add_argument("--max-latency-ms", type=float, default=None)
+    parser.add_argument("--baseline", default=None, help="Optional evaluation-result-v1 baseline JSONL")
+    parser.add_argument("--min-answer-overlap", type=float, default=0.4)
+    parser.add_argument("--junit", default=None, help="Write JUnit XML to this path")
+    parser.add_argument("--sarif", default=None, help="Write SARIF JSON to this path")
     parser.add_argument("--require-security", action="store_true")
     args = parser.parse_args()
     records = load(args.results)
@@ -49,6 +102,12 @@ def main() -> int:
         latencies = [float(item["latency_ms"]) for item in records if item.get("latency_ms") is not None]
         if latencies and max(latencies) > args.max_latency_ms:
             failures.append(f"latency {max(latencies):.0f} ms > {args.max_latency_ms:.0f} ms")
+    if args.baseline:
+        failures.extend(baseline_failures(args.baseline, records, args.min_answer_overlap))
+    if args.junit:
+        write_junit(args.junit, records, failures)
+    if args.sarif:
+        write_sarif(args.sarif, failures)
     if failures:
         print("UNIFIED GATE: FAIL")
         for failure in failures:
