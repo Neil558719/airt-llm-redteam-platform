@@ -20,7 +20,7 @@ JUDGE_MODEL
 
 Self-hosted Runner 直接读取仓库中的 `config.dify.agent.yaml`，因此其中的 `http://127.0.0.1/v1` 指向 Runner 本机的 Dify。若 Dify 在同一内网其他机器上，只需把该配置中的 `base_url` 改为内网地址。
 
-仓库内的 `push` 会自动执行本机实时 Job；手动运行 workflow 时勾选 `run_live=true` 也会执行。普通 `pull_request` 默认只运行离线 Job，避免不受信任的外部 PR 使用本机 Runner；需要对受信任 PR 执行实时测试时，可手动触发 `run_live=true`，并将 `unified-gate` 设为 required check。
+仓库内的 `push` 和同仓库分支发起的 `pull_request` 会自动执行本机实时 Job；手动运行 workflow 时勾选 `run_live=true` 也会执行。来自外部 fork 的 `pull_request` 只运行离线 Job，避免不受信任的代码使用本机 Runner。`main` 分支要求 PR 通过 `unified-gate` 后才能合并。
 
 门禁 Job 会额外生成：
 
