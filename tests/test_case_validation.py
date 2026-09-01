@@ -10,7 +10,7 @@ def write(path: Path, text: str) -> None:
 def test_validate_shared_chatflow_cases():
     summary = validate_cases("shared_cases/unified_chatflow.yaml")
     assert summary.valid
-    assert summary.cases == 8
+    assert summary.cases == 24
 
 
 def test_validate_rejects_duplicate_ids(tmp_path):

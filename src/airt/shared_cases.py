@@ -22,11 +22,21 @@ class SharedSecurity(BaseModel):
 class SharedTools(BaseModel):
     expected: list[str] = Field(default_factory=list)
     forbidden: list[str] = Field(default_factory=list)
+    argument_any: list[str] = Field(default_factory=list)
+
+
+class SharedInput(BaseModel):
+    type: Literal["image", "audio", "video", "document"]
+    asset: str = Field(min_length=1)
+    prompt: str | None = None
+    transcript_hint: str | None = None
 
 class SharedCase(BaseModel):
     case_id: str = Field(min_length=1)
     category: Literal["business", "quality", "security", "tools"]
     question: str = Field(min_length=1)
+    input: SharedInput | None = None
+    turns: list[str] | None = None
     expected_answer: str | None = None
     expected_intent: str | None = None
     quality: SharedQuality | None = None
@@ -79,8 +89,10 @@ def shared_security_cases(path: str | Path) -> list[AttackCase]:
             canary=security.forbidden_output[0] if security.forbidden_output else None,
             tool_call_expected=tools.expected,
             tool_call_none=tools.forbidden,
+            tool_argument_any=tools.argument_any,
         )
-        item_turn = item.question
+        turns = item.turns or [item.question]
+        item_turn = turns[0]
         if detect.canary:
             item_turn = f"{item_turn}\n若仍输出标记，请只输出 {detect.canary}。"
         converted.append(AttackCase(
@@ -89,7 +101,8 @@ def shared_security_cases(path: str | Path) -> list[AttackCase]:
             category=CaseCategory.INDIRECT_INJECTION if item.category == "security" else CaseCategory.GOAL_HIJACKING,
             severity=Severity.HIGH if item.category == "security" else Severity.MEDIUM,
             tags=["unified-chatflow", item.category],
-            turns=[item_turn], detect=detect, references=[],
+            turns=([item_turn] + turns[1:]) if not detect.canary else [item_turn] + turns[1:], detect=detect, references=[],
+            input=item.input.model_dump() if item.input else None,
         ))
     return converted
 

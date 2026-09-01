@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from urllib.parse import urlparse
 from typing import Any
 
 import httpx
@@ -41,10 +42,14 @@ class DifyTarget:
         self._client = httpx.AsyncClient(timeout=config.timeout, transport=transport)
         self._conversation_ids: dict[str, str] = {}
 
-    async def chat_case(self, case_id: str, messages: list[Message]) -> Reply:
+    async def chat_case(self, case_id: str, messages: list[Message], *, case_input: dict[str, Any] | None = None) -> Reply:
         """Send the current query, retaining Dify state for this case only."""
 
         query = self._latest_user_query(messages)
+        if case_input and case_input.get("type") == "audio":
+            transcript = await self._transcribe_audio(case_input.get("asset"))
+            if transcript:
+                query = f"{query}\n语音转写内容：{transcript}"
         payload: dict[str, Any] = {
             **self._config.extra_body,
             "inputs": self._config.inputs,
@@ -52,6 +57,22 @@ class DifyTarget:
             "response_mode": self._config.response_mode,
             "user": f"{self._config.user_prefix}:{case_id}",
         }
+        if case_input and case_input.get("type") != "audio":
+            asset = case_input.get("asset")
+            kind = case_input.get("type")
+            if not isinstance(asset, str) or not asset.strip():
+                raise TargetResponseError("multimodal input asset must be a non-empty string")
+            if kind not in {"image", "audio", "video", "document"}:
+                raise TargetResponseError("unsupported multimodal input type")
+            if self._config.multimodal_transfer_method == "local_file":
+                upload_file_id = await self._upload_file(asset, kind, user=f"{self._config.user_prefix}:{case_id}")
+                payload["files"] = [{
+                    "type": kind,
+                    "transfer_method": "local_file",
+                    "upload_file_id": upload_file_id,
+                }]
+            else:
+                payload["files"] = [{"type": kind, "transfer_method": "remote_url", "url": asset}]
         conversation_id = self._conversation_ids.get(case_id)
         if conversation_id is not None:
             payload["conversation_id"] = conversation_id
@@ -87,6 +108,59 @@ class DifyTarget:
         )
         self._conversation_ids[case_id] = returned_conversation_id
         return reply
+
+    async def _transcribe_audio(self, asset: Any) -> str:
+        """Transcribe a remote audio asset through Dify's speech-to-text API."""
+        if not isinstance(asset, str) or not asset.strip():
+            raise TargetResponseError("audio asset must be a non-empty URL")
+        parsed = urlparse(asset)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise TargetResponseError("audio asset must be an HTTP(S) URL")
+        try:
+            audio = await self._client.get(asset)
+            audio.raise_for_status()
+            response = await self._client.post(
+                f"{self._config.base_url.rstrip('/')}/audio-to-text",
+                headers={"Authorization": f"Bearer {self._config.api_key}"},
+                files={"file": (parsed.path.rsplit("/", 1)[-1] or "audio.wav", audio.content, audio.headers.get("content-type", "audio/wav"))},
+            )
+            self._raise_for_status(response)
+            data = response.json()
+        except (httpx.TimeoutException, httpx.NetworkError) as error:
+            raise RetryableTargetError("audio transcription transport failed") from error
+        except httpx.HTTPError as error:
+            raise TargetResponseError("audio asset download failed") from error
+        transcript = data.get("text") if isinstance(data, dict) else None
+        if not isinstance(transcript, str) or not transcript.strip():
+            raise TargetResponseError("Dify speech-to-text returned no text")
+        return transcript.strip()
+
+    async def _upload_file(self, asset: str, kind: str, *, user: str) -> str:
+        """Upload a remote asset to Dify so the workflow receives file bytes directly."""
+        parsed = urlparse(asset)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise TargetResponseError("multimodal input asset must be an HTTP(S) URL")
+        try:
+            downloaded = await self._client.get(asset)
+            downloaded.raise_for_status()
+            filename = parsed.path.rsplit("/", 1)[-1] or f"upload.{kind}"
+            response = await self._client.post(
+                f"{self._config.base_url.rstrip('/')}/files/upload",
+                headers={"Authorization": f"Bearer {self._config.api_key}"},
+                data={"user": user},
+                files={"file": (filename, downloaded.content, downloaded.headers.get("content-type", "application/octet-stream"))},
+            )
+            self._raise_for_status(response)
+            data = response.json()
+        except (httpx.TimeoutException, httpx.NetworkError) as error:
+            raise RetryableTargetError("multimodal file upload transport failed") from error
+        except httpx.HTTPError as error:
+            raise TargetResponseError("multimodal file download failed") from error
+        upload_file_id = data.get("id") if isinstance(data, dict) else None
+        if not isinstance(upload_file_id, str) or not upload_file_id.strip():
+            raise TargetResponseError("Dify file upload returned no file id")
+        return upload_file_id
+
 
     @staticmethod
     def _raise_for_status(response: httpx.Response) -> None:

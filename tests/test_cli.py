@@ -65,13 +65,111 @@ def test_quality_judge_context_uses_retrieved_sources():
 
 
 def test_shortcut_commands_are_registered():
-    for command in ("chatflow", "doctor"):
+    for command in ("chatflow", "doctor", "baseline"):
         result = runner.invoke(app, [command, "--help"])
         assert result.exit_code == 0
     chatflow_help = runner.invoke(app, ["chatflow", "--help"])
     assert "quality" in chatflow_help.stdout
     assert "release" in chatflow_help.stdout
     assert "assess" in chatflow_help.stdout
+
+
+def test_baseline_commands_run_without_network(tmp_path):
+    baseline = tmp_path / "baseline.jsonl"
+    candidate = tmp_path / "candidate.jsonl"
+    row = {
+        "schema_version": "evaluation-result-v1",
+        "case_id": "q1",
+        "category": "quality",
+        "status": "passed",
+        "answer": "14 天",
+        "tool_calls": [],
+        "latency_ms": 10,
+    }
+    baseline.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    candidate.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+    saved = runner.invoke(app, ["baseline", "save", "--results", str(baseline), "--out", str(tmp_path / "saved.jsonl")])
+    compared = runner.invoke(
+        app,
+        [
+            "baseline",
+            "compare",
+            "--baseline",
+            str(tmp_path / "saved.jsonl"),
+            "--candidate",
+            str(candidate),
+            "--out",
+            str(tmp_path / "comparison"),
+        ],
+    )
+
+    assert saved.exit_code == 0, saved.stdout
+    assert compared.exit_code == 0, compared.stdout
+    assert (tmp_path / "comparison" / "comparison.html").exists()
+
+
+def test_compare_assess_command_auto_discovers_and_merges_run(tmp_path, monkeypatch):
+    run = tmp_path / "runs" / "chatflow-assess"
+    (run / "security").mkdir(parents=True)
+    (run / "quality").mkdir()
+    row = {"schema_version": "evaluation-result-v1", "case_id": "q1", "category": "quality", "status": "passed", "answer": "14 天", "tool_calls": [], "latency_ms": 10}
+    for part in ("security", "quality"):
+        (run / part / "results.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    baseline = tmp_path / "baseline.jsonl"
+    baseline.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["baseline", "compare-assess", "--baseline", str(baseline)])
+
+    assert result.exit_code == 0, result.stdout
+    assert "chatflow-assess" in result.stdout
+    assert list((tmp_path / "reports" / "baseline-assess").rglob("comparison.html"))
+
+
+def test_doctor_validates_cases_without_network(tmp_path, monkeypatch):
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        "target:\n  base_url: http://dify.test/v1\n  api_key: target-key\n  model: target\n"
+        "judge:\n  base_url: http://judge.test/v1\n  api_key: judge-key\n  model: judge\n",
+        encoding="utf-8",
+    )
+    cases = tmp_path / "cases.yaml"
+    cases.write_text(
+        "- id: x-001\n  name: sample\n  category: jailbreak\n  severity: low\n"
+        "  turns: ['hello']\n  detect: {}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli, "probe_url", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("network")))
+
+    result = runner.invoke(app, ["doctor", "--config", str(config), "--cases", str(cases)])
+
+    assert result.exit_code == 0, result.stdout
+    assert "测试用例" in result.stdout
+    assert "target-key" not in result.stdout
+
+
+def test_doctor_network_check_reports_unreachable_endpoint(tmp_path, monkeypatch):
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        "target:\n  base_url: http://dify.test/v1\n  api_key: target-key\n  model: target\n",
+        encoding="utf-8",
+    )
+    cases = tmp_path / "cases.yaml"
+    cases.write_text(
+        "- id: x-001\n  name: sample\n  category: jailbreak\n  severity: low\n"
+        "  turns: ['hello']\n  detect: {}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli, "probe_url", lambda url: cli.CheckResult(False, "无法连接（测试）", "fail"))
+
+    result = runner.invoke(
+        app,
+        ["doctor", "--config", str(config), "--cases", str(cases), "--mode", "security", "--security-judge", "off", "--check-network"],
+    )
+
+    assert result.exit_code == 1
+    assert "无法连接" in result.stdout
 
 
 
@@ -374,3 +472,8 @@ def test_chatflow_assess_runs_security_quality_and_assess_report(monkeypatch, tm
     assert calls[0]["security_judge"] == "always" and calls[0]["shared_cases"] is True
     assert calls[1]["shared_quality"] is True
     assert aggregates == [(tmp_path / "out" / "security" / "results.jsonl", tmp_path / "out" / "quality" / "results.jsonl", Path("reports/assess"))]
+def test_multimodal_asset_selects_matching_case_by_type_and_filename():
+    from airt.cli import _select_multimodal_case
+    case = _select_multimodal_case(Path("shared_cases/multimodal_chatflow.yaml"), Path("mixed_language_injection.wav"), "audio")
+    assert case["case_id"] == "audio_mixed_language_injection_001"
+    assert case["input"]["type"] == "audio"

@@ -95,6 +95,7 @@ class AttackCase(BaseModel):
     severity: Severity
     tags: list[str] = Field(default_factory=list)
     turns: list[str] = Field(min_length=1)
+    input: dict[str, Any] | None = None
     detect: DetectConfig = Field(default_factory=DetectConfig)
     quality: QualitySpec | None = None
     references: list[str] = Field(default_factory=list)

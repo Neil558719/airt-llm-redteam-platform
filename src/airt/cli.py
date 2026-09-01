@@ -5,6 +5,10 @@ from __future__ import annotations
 import asyncio
 import os
 import shutil
+import socket
+import subprocess
+import sys
+import tempfile
 import uuid
 from datetime import datetime, timezone
 from datetime import datetime, timezone
@@ -27,6 +31,8 @@ from airt.config import (
     load_config,
 )
 from airt.dify_adapter import DifyTarget
+from airt.baseline import compare_assess, compare_results, discover_assess_run, save_baseline, write_comparison
+from airt.doctor import CheckResult, check_settings, probe_url
 from airt.evaluation_bridge import EvaluationContext
 from airt.judge.llm import Judge
 from airt.judge.llm import build_judge
@@ -36,6 +42,29 @@ from airt.models import CaseResult, Reply, ResultStatus, RunMetadata, Severity
 from airt.quality_bridge import LiveQualityJudge, QualityEvaluator, QualitySummary
 from airt.target_registry import load_target_registry
 from airt.shared_cases import SharedCaseError, shared_quality_attack_cases, shared_security_cases
+
+
+def _select_multimodal_case(cases_path: Path, asset: Path, asset_type: str | None = None) -> dict:
+    """Select the closest multimodal case for one local image/audio asset."""
+    kind = asset_type or ("audio" if asset.suffix.casefold() in {".wav", ".mp3", ".m4a", ".ogg"} else "image")
+    rows = yaml.safe_load(cases_path.read_text(encoding="utf-8"))
+    candidates = [row for row in rows if row.get("input", {}).get("type") == kind]
+    if not candidates:
+        raise ValueError(f"no multimodal {kind} case is available")
+    stem = asset.stem.casefold()
+    def rank(row: dict) -> tuple[int, str]:
+        cid = row["case_id"]
+        return (0 if any(token in stem and token in cid for token in ("sensitive", "mixed", "tool", "ocr", "prompt")) else 1, cid)
+    selected = dict(sorted(candidates, key=rank)[0])
+    selected["input"] = dict(selected["input"])
+    selected["input"]["asset"] = f"http://host.docker.internal:8765/{asset.name}"
+    return selected
+
+
+def _free_port() -> int:
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
 
 
 def release_gate_failures(
@@ -124,6 +153,88 @@ def targets(
 
 cases_app = typer.Typer(help="测试用例资产管理")
 app.add_typer(cases_app, name="cases")
+
+baseline_app = typer.Typer(help="离线回归基线管理，不调用目标应用或 Judge")
+app.add_typer(baseline_app, name="baseline")
+
+
+@baseline_app.command("save")
+def baseline_save(
+    results: Annotated[Path, typer.Option("--results", exists=True, readable=True)],
+    out: Path = typer.Option(..., "--out", help="基线 JSONL 输出路径"),
+) -> None:
+    """保存一份不可混淆的本地结果基线。"""
+    try:
+        saved = save_baseline(results, out)
+    except (OSError, ValueError) as error:
+        _fail(str(error))
+    console.print(f"基线已保存：{saved}")
+    console.print(f"基线元信息：{saved.with_suffix('.json')}")
+
+
+@baseline_app.command("compare")
+def baseline_compare(
+    baseline: Annotated[Path, typer.Option("--baseline", exists=True, readable=True)],
+    candidate: Annotated[Path, typer.Option("--candidate", exists=True, readable=True)],
+    out: Path = typer.Option(..., "--out", help="比较报告输出目录"),
+    min_answer_overlap: float = typer.Option(0.4, min=0.0, max=1.0, help="最低回答相似度"),
+    max_latency_increase: float | None = typer.Option(None, min=0.0, help="最大延迟增幅，例如 0.5 表示最多增加 50%"),
+) -> None:
+    """比较本地基线与当前结果并生成 JSON/HTML 报告。"""
+    try:
+        comparison = compare_results(
+            baseline,
+            candidate,
+            min_answer_overlap=min_answer_overlap,
+            max_latency_increase=max_latency_increase,
+        )
+        json_path, html_path = write_comparison(comparison, out)
+    except (OSError, ValueError) as error:
+        _fail(str(error))
+    if comparison.passed:
+        console.print(f"[green]基线比较通过[/green]（{len(comparison.rows)} 条用例）")
+    else:
+        console.print(f"[red]基线比较失败[/red]（{len(comparison.failures)} 个差异）")
+        for failure in comparison.failures:
+            console.print(f"- {failure}")
+    console.print(f"JSON 报告：{json_path}")
+    console.print(f"HTML 报告：{html_path}")
+    if not comparison.passed:
+        raise typer.Exit(code=1)
+
+
+@baseline_app.command("compare-assess")
+def baseline_compare_assess(
+    baseline: Annotated[Path, typer.Option("--baseline", exists=True, readable=True)],
+    run_dir: Path | None = typer.Option(None, "--run-dir", help="指定 assess 结果目录；省略时自动选择最近完整结果"),
+    out: Path | None = typer.Option(None, "--out", help="比较报告目录；省略时写入 reports/baseline-assess/<时间戳>"),
+    min_answer_overlap: float = typer.Option(0.4, min=0.0, max=1.0, help="最低回答相似度"),
+    max_latency_increase: float | None = typer.Option(None, min=0.0, help="最大延迟增幅，例如 0.5 表示最多增加 50%"),
+) -> None:
+    """自动合并最近一次 assess 的安全和质量结果并与基线比较。"""
+    try:
+        selected_run = run_dir or discover_assess_run(Path("runs"))
+        destination = out or (Path("reports") / "baseline-assess" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+        comparison = compare_assess(
+            baseline,
+            selected_run,
+            min_answer_overlap=min_answer_overlap,
+            max_latency_increase=max_latency_increase,
+        )
+        json_path, html_path = write_comparison(comparison, destination)
+    except (OSError, ValueError) as error:
+        _fail(str(error))
+    console.print(f"比较对象：{selected_run}")
+    if comparison.passed:
+        console.print(f"[green]Assess 基线比较通过[/green]（{len(comparison.rows)} 条用例）")
+    else:
+        console.print(f"[red]Assess 基线比较失败[/red]（{len(comparison.failures)} 个差异）")
+        for failure in comparison.failures:
+            console.print(f"- {failure}")
+    console.print(f"JSON 报告：{json_path}")
+    console.print(f"HTML 报告：{html_path}")
+    if not comparison.passed:
+        raise typer.Exit(code=1)
 
 
 @cases_app.command("validate")
@@ -267,31 +378,92 @@ def chatflow_security(
     out: Path | None = typer.Option(None, help="结果目录，默认 runs/chatflow-security"),
     runs_dir: Path = typer.Option(Path("runs"), help="快捷命令默认运行目录"),
     security_judge: str = typer.Option("always", help="off、case 或 always"),
+    asset: Path | None = typer.Option(None, help="单个本地图片或音频文件；自动匹配多模态用例"),
+    asset_type: str | None = typer.Option(None, "--asset-type", help="image 或 audio；默认按扩展名推断"),
 ) -> None:
-    run(config=config, cases=cases, out=_shortcut_out(out, runs_dir, "chatflow", "security"), mode="security", security_judge=security_judge, shared_cases=True)
+    if asset is None:
+        run(config=config, cases=cases, out=_shortcut_out(out, runs_dir, "chatflow", "security"), mode="security", security_judge=security_judge, shared_cases=True)
+        return
+    if not asset.is_file():
+        _fail(f"asset does not exist: {asset}")
+    cases = Path("shared_cases/multimodal_chatflow.yaml")
+    selected = _select_multimodal_case(cases, asset, asset_type)
+    with tempfile.TemporaryDirectory(prefix="airt-multimodal-") as temp:
+        case_file = Path(temp) / "case.yaml"
+        port = _free_port()
+        selected["input"] = dict(selected["input"])
+        selected["input"]["asset"] = f"http://host.docker.internal:{port}/{asset.name}"
+        case_file.write_text(yaml.safe_dump([selected], allow_unicode=True, sort_keys=False), encoding="utf-8")
+        server = subprocess.Popen([sys.executable, "-m", "http.server", str(port), "--bind", "0.0.0.0", "--directory", str(asset.parent)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            run(config=config, cases=case_file, out=_shortcut_out(out, runs_dir, "chatflow", "security"), mode="security", security_judge=security_judge, shared_cases=True)
+        finally:
+            server.terminate()
+            server.wait(timeout=5)
 
 
 @app.command()
 def doctor(
     config: Path = typer.Option(Path("config.dify.yaml"), exists=True, readable=True),
     mode: str = typer.Option("quality", help="security、quality 或 release"),
+    cases: Path | None = typer.Option(None, help="测试用例文件或目录；省略时按配置名称推断"),
+    target_profile: str | None = typer.Option(None, help="可选目标 profile 名称"),
+    security_judge: str | None = typer.Option(None, help="security 模式下的 Judge 策略：off、case 或 always"),
+    check_network: bool = typer.Option(False, "--check-network", help="显式探测目标和 Judge 地址；默认不联网"),
 ) -> None:
-    """检查配置和环境变量，不调用被测应用或 Judge。"""
+    """检查配置、密钥和测试资产；默认不调用被测应用或 Judge。"""
+    case_path = cases
     try:
-        security, quality = _resolve_run_mode(mode)
+        security, quality = _resolve_run_mode(mode, security_judge=security_judge)
         settings = load_config(config, include_judge=not (security == "off" and quality == "offline"))
+        target = settings.resolve_target(target_profile)
+        if case_path is None:
+            case_path = (
+                Path("shared_cases/unified_chatflow.yaml")
+                if getattr(target, "capture_tool_calls", False) or "agent" in config.name.casefold()
+                else Path("cases/dify.yaml")
+            )
+        checks = check_settings(
+            settings,
+            mode=mode,
+            security_judge=security_judge,
+            cases_path=case_path,
+            target_profile=target_profile,
+        )
     except (ConfigError, ValueError) as error:
         console.print(f"[red][FAIL][/red] 配置：{error}")
         raise typer.Exit(code=2)
-    checks = [("目标 API Key", bool(settings.target.api_key))]
-    if quality == "offline" and security == "off":
-        console.print("[yellow][SKIP][/yellow] Judge：当前模式关闭")
-    if quality == "live" or security != "off":
-        checks.append(("Judge 配置", settings.judge is not None))
-        checks.append(("Judge API Key", bool(settings.judge and settings.judge.api_key)))
-    for label, ok in checks:
-        console.print(f"[{'green' if ok else 'red'}][{'OK' if ok else 'FAIL'}][/{'green' if ok else 'red'}] {label}")
-    if not all(ok for _, ok in checks):
+    try:
+        case_summary = validate_cases(case_path)
+    except (OSError, ValueError) as error:
+        case_summary = None
+        checks["cases"] = CheckResult(False, f"测试用例校验失败：{error}", "fail")
+    if case_summary is not None:
+        if case_summary.valid:
+            checks["cases"] = CheckResult(
+                True, f"测试用例有效（{case_summary.files} 个文件，{case_summary.cases} 条用例）"
+            )
+        else:
+            checks["cases"] = CheckResult(
+                False,
+                f"测试用例校验失败（{len(case_summary.issues)} 个问题）",
+                "fail",
+            )
+            for issue in case_summary.issues:
+                console.print(f"[red]- {issue.source}: {issue.message}[/red]")
+    if check_network:
+        checks["target_endpoint"] = probe_url(target.base_url)
+        if settings.judge is not None and any(
+            item.status != "skip" for key, item in checks.items() if key.startswith("judge_")
+        ):
+            checks["judge_endpoint"] = probe_url(settings.judge.base_url)
+    else:
+        checks["network"] = CheckResult(True, "网络探测未启用（默认离线）", "skip")
+    for label, result in checks.items():
+        color = "green" if result.ok and result.status != "fail" else "red"
+        marker = "SKIP" if result.status == "skip" else ("OK" if result.ok else "FAIL")
+        console.print(f"[{color}][{marker}][/{color}] {result.message}")
+    if not all(result.ok for result in checks.values()):
         raise typer.Exit(code=1)
 
 

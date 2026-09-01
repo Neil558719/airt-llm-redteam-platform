@@ -36,13 +36,18 @@ QualityEvaluatorLike = Callable[[AttackCase, Reply, float], Any]
 
 
 async def _chat_for_case(
-    target: Target, case_id: str, messages: list[Message]
+    target: Target, case_id: str, messages: list[Message], *, case_input: dict[str, Any] | None = None
 ) -> Reply:
     """Use per-case target state when the optional capability is available."""
 
     case_chat = getattr(target, "chat_case", None)
     if case_chat is not None:
-        return await case_chat(case_id, messages)
+        try:
+            return await case_chat(case_id, messages, case_input=case_input)
+        except TypeError as error:
+            if "case_input" not in str(error):
+                raise
+            return await case_chat(case_id, messages)
     return await target.chat(messages)
 
 
@@ -209,7 +214,7 @@ async def run_cases(
                     for attempt in range(retries + 1):
                         await limiter.acquire()
                         try:
-                            reply = await _chat_for_case(target, case.id, messages)
+                            reply = await _chat_for_case(target, case.id, messages, case_input=case.input)
                         except RetryableTargetError as caught:
                             if attempt >= retries:
                                 raise

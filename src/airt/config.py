@@ -36,6 +36,7 @@ class DifyTargetConfig(BaseModel):
     extra_body: dict[str, Any] = Field(default_factory=dict)
     response_mode: Literal["blocking", "streaming"] = "blocking"
     capture_tool_calls: bool = False
+    multimodal_transfer_method: Literal["remote_url", "local_file"] = "remote_url"
 
     @model_validator(mode="after")
     def streaming_requires_tool_capture(self) -> "DifyTargetConfig":

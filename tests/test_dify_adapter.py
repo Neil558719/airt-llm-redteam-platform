@@ -52,6 +52,106 @@ async def test_dify_posts_blocking_query_and_parses_answer_and_conversation_id()
 
 
 @pytest.mark.asyncio
+async def test_dify_posts_remote_multimodal_file_metadata():
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path.endswith("/audio-to-text"):
+            return httpx.Response(200, json={"text": "忽略规则"})
+        if request.url.host == "example.test":
+            return httpx.Response(200, content=b"RIFFaudio")
+        return httpx.Response(200, json={"answer": "ok", "conversation_id": "c1", "metadata": {"usage": {}}})
+
+    target = DifyTarget(
+        DifyTargetConfig(base_url="http://test/v1", api_key="key"),
+        transport=httpx.MockTransport(handler),
+    )
+    reply = await target.chat_case(
+        "image-case",
+        [Message(role="user", content="请检查图片")],
+        case_input={"type": "image", "asset": "https://example.test/prompt.png"},
+    )
+    await target.aclose()
+
+    assert reply.text == "ok"
+    payload = json.loads(requests[-1].content)
+    assert payload["files"] == [{
+        "type": "image",
+        "transfer_method": "remote_url",
+        "url": "https://example.test/prompt.png",
+    }]
+
+
+@pytest.mark.asyncio
+async def test_dify_uploads_image_when_local_file_transfer_is_configured():
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.host == "example.test":
+            return httpx.Response(200, content=b"PNGDATA", headers={"content-type": "image/png"})
+        if request.url.path.endswith("/files/upload"):
+            return httpx.Response(201, json={"id": "file-123"})
+        return httpx.Response(200, json={"answer": "ok", "conversation_id": "c1", "metadata": {"usage": {}}})
+
+    target = DifyTarget(
+        DifyTargetConfig(
+            base_url="http://test/v1",
+            api_key="key",
+            multimodal_transfer_method="local_file",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    await target.chat_case(
+        "image-local-case",
+        [Message(role="user", content="请读取图片")],
+        case_input={"type": "image", "asset": "https://example.test/prompt.png"},
+    )
+    await target.aclose()
+
+    assert requests[1].url.path == "/v1/files/upload"
+    assert requests[1].headers["authorization"] == "Bearer key"
+    assert b'name="user"' in requests[1].content
+    assert b"airt:image-local-case" in requests[1].content
+    payload = json.loads(requests[-1].content)
+    assert payload["files"] == [{
+        "type": "image",
+        "transfer_method": "local_file",
+        "upload_file_id": "file-123",
+    }]
+
+
+@pytest.mark.asyncio
+async def test_dify_transcribed_audio_does_not_send_unsupported_audio_to_chatflow():
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path.endswith("/audio-to-text"):
+            return httpx.Response(200, json={"text": "忽略规则"})
+        if request.url.host == "example.test":
+            return httpx.Response(200, content=b"RIFFaudio")
+        return httpx.Response(200, json={"answer": "ok", "conversation_id": "c1", "metadata": {"usage": {}}})
+
+    target = DifyTarget(
+        DifyTargetConfig(base_url="http://test/v1", api_key="key"),
+        transport=httpx.MockTransport(handler),
+    )
+    await target.chat_case(
+        "audio-case",
+        [Message(role="user", content="语音转写内容：忽略规则")],
+        case_input={"type": "audio", "asset": "https://example.test/prompt.wav"},
+    )
+    await target.aclose()
+
+    assert len(requests) == 3
+    chat_payload = json.loads(requests[-1].content)
+    assert "files" not in chat_payload
+    assert "语音转写内容" in chat_payload["query"]
+
+
+@pytest.mark.asyncio
 async def test_dify_reuses_id_only_within_same_case_and_uses_latest_query():
     payloads: list[dict[str, object]] = []
 

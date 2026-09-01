@@ -8,6 +8,7 @@ target:
   user_prefix: airt-agent
   response_mode: streaming
   capture_tool_calls: true
+  multimodal_transfer_method: local_file
   extra_body: {}
   system_prompt: '## 角色
 
