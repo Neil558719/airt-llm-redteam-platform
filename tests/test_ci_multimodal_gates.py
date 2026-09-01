@@ -20,4 +20,6 @@ def test_self_hosted_live_gates_configure_runner_proxy_for_checkout():
     workflow = WORKFLOW.read_text(encoding="utf-8")
     live_jobs = workflow.split("  live-chatflow-security:", 1)[1]
 
-    assert live_jobs.count("http-proxy: http://127.0.0.1:10808") == 2
+    assert live_jobs.count("HTTP_PROXY: http://127.0.0.1:10808") == 2
+    assert live_jobs.count("HTTPS_PROXY: http://127.0.0.1:10808") == 2
+    assert "http-proxy:" not in live_jobs
