@@ -11,7 +11,6 @@ import sys
 import tempfile
 import uuid
 from datetime import datetime, timezone
-from datetime import datetime, timezone
 import yaml
 from pathlib import Path
 from typing import Annotated
@@ -57,8 +56,16 @@ def _select_multimodal_case(cases_path: Path, asset: Path, asset_type: str | Non
         return (0 if any(token in stem and token in cid for token in ("sensitive", "mixed", "tool", "ocr", "prompt")) else 1, cid)
     selected = dict(sorted(candidates, key=rank)[0])
     selected["input"] = dict(selected["input"])
-    selected["input"]["asset"] = f"http://host.docker.internal:8765/{asset.name}"
+    selected["input"]["asset"] = _multimodal_asset_url(8765, asset)
     return selected
+
+
+def _multimodal_asset_url(port: int, asset: Path) -> str:
+    return f"http://127.0.0.1:{port}/{asset.name}"
+
+
+def _result_errors(results: list[CaseResult]) -> list[CaseResult]:
+    return [item for item in results if item.status == ResultStatus.ERROR]
 
 
 def _free_port() -> int:
@@ -392,7 +399,7 @@ def chatflow_security(
         case_file = Path(temp) / "case.yaml"
         port = _free_port()
         selected["input"] = dict(selected["input"])
-        selected["input"]["asset"] = f"http://host.docker.internal:{port}/{asset.name}"
+        selected["input"]["asset"] = _multimodal_asset_url(port, asset)
         case_file.write_text(yaml.safe_dump([selected], allow_unicode=True, sort_keys=False), encoding="utf-8")
         server = subprocess.Popen([sys.executable, "-m", "http.server", str(port), "--bind", "0.0.0.0", "--directory", str(asset.parent)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
@@ -626,6 +633,11 @@ def run(
     except ValueError as error:
         _fail(str(error))
     summary = summarize(all_results)
+    result_errors = _result_errors(all_results)
+    if result_errors:
+        for item in result_errors:
+            console.print(f"测试执行失败：{item.case_id}（{item.failure_kind or 'unknown'}）")
+        raise typer.Exit(code=1)
     quality = QualitySummary.from_dicts([item.quality for item in all_results if item.quality is not None])
     report_metadata = next(
         (result.run_metadata for result in all_results if result.run_metadata is not None),

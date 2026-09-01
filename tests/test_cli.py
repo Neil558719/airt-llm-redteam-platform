@@ -477,3 +477,9 @@ def test_multimodal_asset_selects_matching_case_by_type_and_filename():
     case = _select_multimodal_case(Path("shared_cases/multimodal_chatflow.yaml"), Path("mixed_language_injection.wav"), "audio")
     assert case["case_id"] == "audio_mixed_language_injection_001"
     assert case["input"]["type"] == "audio"
+
+
+def test_multimodal_local_asset_url_uses_runner_loopback():
+    from airt.cli import _multimodal_asset_url
+
+    assert _multimodal_asset_url(8765, Path("prompt_injection.png")) == "http://127.0.0.1:8765/prompt_injection.png"
