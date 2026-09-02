@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import uuid
+import re
 from datetime import datetime, timezone
 import yaml
 from pathlib import Path
@@ -66,6 +67,30 @@ def _multimodal_asset_url(port: int, asset: Path) -> str:
 
 def _result_errors(results: list[CaseResult]) -> list[CaseResult]:
     return [item for item in results if item.status == ResultStatus.ERROR]
+
+
+def _failure_summary(error: str | None) -> str:
+    """Return a useful failure class without echoing provider response content."""
+
+    if not error:
+        return "unknown error"
+    error_class = error.split(":", 1)[0].strip() or "unknown error"
+    http_status = re.search(r"\bHTTP (\d{3})\b", error)
+    if http_status:
+        return f"{error_class}: HTTP {http_status.group(1)}"
+    safe_types = (
+        "ReadTimeout",
+        "WriteTimeout",
+        "ConnectTimeout",
+        "PoolTimeout",
+        "ConnectError",
+        "RemoteProtocolError",
+        "NetworkError",
+    )
+    for safe_type in safe_types:
+        if safe_type in error:
+            return f"{error_class}: {safe_type}"
+    return error_class
 
 
 def _free_port() -> int:
@@ -387,9 +412,10 @@ def chatflow_security(
     security_judge: str = typer.Option("always", help="off、case 或 always"),
     asset: Path | None = typer.Option(None, help="单个本地图片或音频文件；自动匹配多模态用例"),
     asset_type: str | None = typer.Option(None, "--asset-type", help="image 或 audio；默认按扩展名推断"),
+    resume: bool = typer.Option(False, "--resume", help="仅重跑结果中尚未完成的用例"),
 ) -> None:
     if asset is None:
-        run(config=config, cases=cases, out=_shortcut_out(out, runs_dir, "chatflow", "security"), mode="security", security_judge=security_judge, shared_cases=True)
+        run(config=config, cases=cases, out=_shortcut_out(out, runs_dir, "chatflow", "security"), mode="security", security_judge=security_judge, shared_cases=True, resume=resume)
         return
     if not asset.is_file():
         _fail(f"asset does not exist: {asset}")
@@ -403,7 +429,7 @@ def chatflow_security(
         case_file.write_text(yaml.safe_dump([selected], allow_unicode=True, sort_keys=False), encoding="utf-8")
         server = subprocess.Popen([sys.executable, "-m", "http.server", str(port), "--bind", "0.0.0.0", "--directory", str(asset.parent)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
-            run(config=config, cases=case_file, out=_shortcut_out(out, runs_dir, "chatflow", "security"), mode="security", security_judge=security_judge, shared_cases=True)
+            run(config=config, cases=case_file, out=_shortcut_out(out, runs_dir, "chatflow", "security"), mode="security", security_judge=security_judge, shared_cases=True, resume=resume)
         finally:
             server.terminate()
             server.wait(timeout=5)
@@ -636,7 +662,10 @@ def run(
     result_errors = _result_errors(all_results)
     if result_errors:
         for item in result_errors:
-            console.print(f"测试执行失败：{item.case_id}（{item.failure_kind or 'unknown'}）")
+            console.print(
+                f"测试执行失败：{item.case_id}（{item.failure_kind or 'unknown'}；"
+                f"{_failure_summary(item.error)}）"
+            )
         raise typer.Exit(code=1)
     quality = QualitySummary.from_dicts([item.quality for item in all_results if item.quality is not None])
     report_metadata = next(
@@ -759,15 +788,19 @@ def _read_results(path: Path) -> tuple[list[CaseResult], bytes]:
     except UnicodeDecodeError as error:
         raise ValueError(f"could not decode results {path} as UTF-8") from error
 
-    parsed: list[CaseResult] = []
+    latest: dict[str, CaseResult] = {}
     for line_number, line in enumerate(text.splitlines(), start=1):
         if not line.strip():
             continue
         try:
-            parsed.append(CaseResult.model_validate_json(line))
+            result = CaseResult.model_validate_json(line)
+            # Resume keeps the append-only JSONL for audit purposes. Reports and
+            # gates use the newest attempt so a recovered transient error does
+            # not keep the run failed forever.
+            latest[result.case_id] = result
         except (TypeError, ValueError) as error:
             raise ValueError(f"malformed results JSONL at {path}:{line_number}") from error
-    return parsed, source
+    return list(latest.values()), source
 
 
 def _severity_weight(value: object) -> int:

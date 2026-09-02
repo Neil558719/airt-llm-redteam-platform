@@ -43,7 +43,10 @@ def from_airt(result: CaseResult, *, target: str = "unified_dify_chatflow") -> d
         "latency_ms": result.latency_ms,
         "judge": {"used": result.security_judge_used, "source": "live" if result.security_judge_used else "rule"},
         "error": result.error,
-        "metadata": (result.run_metadata.model_dump(mode="json") if result.run_metadata else {}),
+        "metadata": {
+            **(result.run_metadata.model_dump(mode="json") if result.run_metadata else {}),
+            "input_type": (case.input or {}).get("type") if case and case.input else None,
+        },
     }
 
 

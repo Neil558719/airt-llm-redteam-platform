@@ -2,6 +2,7 @@ name: Airt unified quality and security checks
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
     inputs:
@@ -67,36 +68,21 @@ jobs:
       - run: python -m venv .venv
       - run: .venv\Scripts\python.exe -m pip install -e ".[test]"
       - name: Run Chatflow security
-        run: .venv\Scripts\airt.exe chatflow security --config config.dify.agent.yaml --out runs/ci-chatflow
+        run: |
+          .venv\Scripts\airt.exe chatflow security --config config.dify.agent.yaml --out runs/ci-chatflow
+          $firstExit = $LASTEXITCODE
+          if ($firstExit -ne 0) {
+            .venv\Scripts\airt.exe chatflow security --config config.dify.agent.yaml --out runs/ci-chatflow --resume
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         env:
           DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
           JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
           JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
           JUDGE_MODEL: ${{ secrets.JUDGE_MODEL }}
-      - name: Run image input smoke security
-        run: >-
-          .venv\Scripts\airt.exe chatflow security
-          --config config.dify.agent.yaml
-          --asset fixtures\multimodal\prompt_injection.png
-          --asset-type image
-          --out runs/ci-chatflow-multimodal-image
-        env:
-          DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
-          JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
-          JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
-          JUDGE_MODEL: ${{ secrets.JUDGE_MODEL }}
-      - name: Run audio input smoke security
-        run: >-
-          .venv\Scripts\airt.exe chatflow security
-          --config config.dify.agent.yaml
-          --asset fixtures\multimodal\prompt_injection.wav
-          --asset-type audio
-          --out runs/ci-chatflow-multimodal-audio
-        env:
-          DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
-          JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
-          JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
-          JUDGE_MODEL: ${{ secrets.JUDGE_MODEL }}
+      - name: Prepare security report directories
+        if: always()
+        run: New-Item -ItemType Directory -Force -Path reports/security, reports, artifacts/security | Out-Null
       - name: Generate security trend and dashboard
         if: always()
         run: |
@@ -111,7 +97,91 @@ jobs:
             reports/security/
             artifacts/security/
             runs/ci-chatflow/results.jsonl
+
+  live-chatflow-image-smoke:
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && inputs.run_live == true) }}
+    runs-on: [self-hosted, windows, dify-local]
+    needs: offline
+    steps:
+      - uses: actions/checkout@v4
+        env:
+          HTTP_PROXY: http://127.0.0.1:10808
+          HTTPS_PROXY: http://127.0.0.1:10808
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m venv .venv
+      - run: .venv\Scripts\python.exe -m pip install -e ".[test]"
+      - name: Run image input smoke security
+        run: |
+          .venv\Scripts\airt.exe chatflow security --config config.dify.agent.yaml --asset fixtures\multimodal\prompt_injection.png --asset-type image --out runs/ci-chatflow-multimodal-image
+          $firstExit = $LASTEXITCODE
+          if ($firstExit -ne 0) {
+            .venv\Scripts\airt.exe chatflow security --config config.dify.agent.yaml --asset fixtures\multimodal\prompt_injection.png --asset-type image --out runs/ci-chatflow-multimodal-image --resume
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        env:
+          DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
+          JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
+          JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
+          JUDGE_MODEL: ${{ secrets.JUDGE_MODEL }}
+      - name: Generate image smoke report
+        if: always()
+        run: |
+          New-Item -ItemType Directory -Force -Path reports/security, reports, artifacts/security | Out-Null
+          .venv\Scripts\airt.exe trend --reports reports/security
+          .venv\Scripts\airt.exe dashboard --reports reports --out artifacts/security
+      - name: Upload image smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: airt-chatflow-image-smoke
+          path: |
+            reports/security/
+            artifacts/security/
             runs/ci-chatflow-multimodal-image/results.jsonl
+
+  live-chatflow-audio-smoke:
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && inputs.run_live == true) }}
+    runs-on: [self-hosted, windows, dify-local]
+    needs: offline
+    steps:
+      - uses: actions/checkout@v4
+        env:
+          HTTP_PROXY: http://127.0.0.1:10808
+          HTTPS_PROXY: http://127.0.0.1:10808
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m venv .venv
+      - run: .venv\Scripts\python.exe -m pip install -e ".[test]"
+      - name: Run audio input smoke security
+        run: |
+          .venv\Scripts\airt.exe chatflow security --config config.dify.agent.yaml --asset fixtures\multimodal\prompt_injection.wav --asset-type audio --out runs/ci-chatflow-multimodal-audio
+          $firstExit = $LASTEXITCODE
+          if ($firstExit -ne 0) {
+            .venv\Scripts\airt.exe chatflow security --config config.dify.agent.yaml --asset fixtures\multimodal\prompt_injection.wav --asset-type audio --out runs/ci-chatflow-multimodal-audio --resume
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        env:
+          DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
+          JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
+          JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
+          JUDGE_MODEL: ${{ secrets.JUDGE_MODEL }}
+      - name: Generate audio smoke report
+        if: always()
+        run: |
+          New-Item -ItemType Directory -Force -Path reports/security, reports, artifacts/security | Out-Null
+          .venv\Scripts\airt.exe trend --reports reports/security
+          .venv\Scripts\airt.exe dashboard --reports reports --out artifacts/security
+      - name: Upload audio smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: airt-chatflow-audio-smoke
+          path: |
+            reports/security/
+            artifacts/security/
             runs/ci-chatflow-multimodal-audio/results.jsonl
 
   live-chatflow-quality:
@@ -151,9 +221,9 @@ jobs:
             runs/ci-chatflow-quality/results.jsonl
 
   unified-gate:
-    if: ${{ always() && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && inputs.run_live == true)) && needs.offline.result == 'success' && needs.shared-quality.result == 'success' && needs.live-chatflow-security.result == 'success' && needs.live-chatflow-quality.result == 'success' }}
+    if: ${{ always() && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && inputs.run_live == true)) }}
     runs-on: ubuntu-latest
-    needs: [offline, shared-quality, live-chatflow-security, live-chatflow-quality]
+    needs: [offline, shared-quality, live-chatflow-security, live-chatflow-image-smoke, live-chatflow-audio-smoke, live-chatflow-quality]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -167,24 +237,44 @@ jobs:
           pattern: airt-chatflow-*
           path: gate-input
           merge-multiple: false
+      - name: Check required jobs and result files
+        run: |
+          test "${{ needs.offline.result }}" = success
+          test "${{ needs.shared-quality.result }}" = success
+          test "${{ needs.live-chatflow-security.result }}" = success
+          test "${{ needs.live-chatflow-image-smoke.result }}" = success
+          test "${{ needs.live-chatflow-audio-smoke.result }}" = success
+          test "${{ needs.live-chatflow-quality.result }}" = success
+          test -s gate-input/airt-chatflow-security/runs/ci-chatflow/results.jsonl
+          test -s gate-input/airt-chatflow-image-smoke/runs/ci-chatflow-multimodal-image/results.jsonl
+          test -s gate-input/airt-chatflow-audio-smoke/runs/ci-chatflow-multimodal-audio/results.jsonl
       - name: Convert Airt results to shared contract
         run: |
           mkdir -p gate-results
           security_input="$(find gate-input/airt-chatflow-security -path '*/results.jsonl' -print -quit)"
           quality_input="$(find gate-input/airt-chatflow-quality -path '*/results.jsonl' -print -quit)"
+          image_input="$(find gate-input/airt-chatflow-image-smoke -path '*/results.jsonl' -print -quit)"
+          audio_input="$(find gate-input/airt-chatflow-audio-smoke -path '*/results.jsonl' -print -quit)"
           test -n "$security_input"
           test -n "$quality_input"
+          test -n "$image_input"
+          test -n "$audio_input"
           .venv/bin/python scripts/airt_results_to_v1.py --input "$security_input" --output gate-results/security.jsonl
+          .venv/bin/python scripts/airt_results_to_v1.py --input "$image_input" --output gate-results/image.jsonl
+          .venv/bin/python scripts/airt_results_to_v1.py --input "$audio_input" --output gate-results/audio.jsonl
           .venv/bin/python scripts/airt_results_to_v1.py --input "$quality_input" --output gate-results/quality.jsonl
       - name: Run unified gate
         run: |
           .venv/bin/python scripts/unified_gate.py \
             --results gate-results/security.jsonl \
+            --results gate-results/image.jsonl \
+            --results gate-results/audio.jsonl \
             --results gate-results/quality.jsonl \
             --require-security \
             --min-security-score 90 \
             --min-quality-pass-rate 1.0 \
             --max-latency-ms 20000 \
+            --max-multimodal-latency-ms 60000 \
             --junit reports/ci/unified-gate.junit.xml \
             --sarif reports/ci/unified-gate.sarif
       - name: Upload gate reports

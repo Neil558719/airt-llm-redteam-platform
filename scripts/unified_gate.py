@@ -69,6 +69,7 @@ def main() -> int:
     parser.add_argument("--min-security-score", type=float, default=None)
     parser.add_argument("--min-quality-pass-rate", type=float, default=None)
     parser.add_argument("--max-latency-ms", type=float, default=None)
+    parser.add_argument("--max-multimodal-latency-ms", type=float, default=None)
     parser.add_argument("--baseline", default=None, help="Optional evaluation-result-v1 baseline JSONL")
     parser.add_argument("--min-answer-overlap", type=float, default=0.4)
     parser.add_argument("--junit", default=None, help="Write JUnit XML to this path")
@@ -99,9 +100,13 @@ def main() -> int:
         if rate < args.min_quality_pass_rate:
             failures.append(f"quality pass rate {rate:.1%} < {args.min_quality_pass_rate:.1%}")
     if args.max_latency_ms is not None:
-        latencies = [float(item["latency_ms"]) for item in records if item.get("latency_ms") is not None]
+        latencies = [float(item["latency_ms"]) for item in records if item.get("latency_ms") is not None and item.get("metadata", {}).get("input_type") not in {"image", "audio", "video", "document"}]
         if latencies and max(latencies) > args.max_latency_ms:
             failures.append(f"latency {max(latencies):.0f} ms > {args.max_latency_ms:.0f} ms")
+    if args.max_multimodal_latency_ms is not None:
+        latencies = [float(item["latency_ms"]) for item in records if item.get("latency_ms") is not None and item.get("metadata", {}).get("input_type") in {"image", "audio", "video", "document"}]
+        if latencies and max(latencies) > args.max_multimodal_latency_ms:
+            failures.append(f"multimodal latency {max(latencies):.0f} ms > {args.max_multimodal_latency_ms:.0f} ms")
     if args.baseline:
         failures.extend(baseline_failures(args.baseline, records, args.min_answer_overlap))
     if args.junit:

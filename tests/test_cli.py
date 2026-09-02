@@ -12,7 +12,7 @@ from airt.adapter import OpenAICompatTarget
 from airt.cli import app, build_target
 from airt.config import DifyTargetConfig, TargetConfig
 from airt.dify_adapter import DifyTarget
-from airt.models import AttackCase, CaseResult, Reply, RunMetadata, Verdict
+from airt.models import AttackCase, CaseResult, Reply, ResultStatus, RunMetadata, Verdict
 
 
 runner = CliRunner()
@@ -294,6 +294,46 @@ def test_report_rejects_malformed_jsonl(tmp_path):
     assert "results" in result.stdout.lower()
 
 
+def test_read_results_uses_latest_attempt_for_each_case(tmp_path):
+    case = _case("retry-case")
+    failed = CaseResult(
+        case_id=case.id,
+        case=case,
+        status="error",
+        error="JudgeError: ReadTimeout",
+        failure_kind="judge",
+    )
+    recovered = CaseResult(
+        case_id=case.id,
+        case=case,
+        status="completed",
+        verdict=Verdict(status="fail", source="judge", confidence=0.9, reason="blocked"),
+    )
+    results = tmp_path / "results.jsonl"
+    results.write_text(
+        failed.model_dump_json() + "\n" + recovered.model_dump_json() + "\n",
+        encoding="utf-8",
+    )
+
+    loaded, source = cli._read_results(results)
+
+    assert source == results.read_bytes()
+    assert len(loaded) == 1
+    assert loaded[0].status == ResultStatus.COMPLETED
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        ("JudgeError: openai-compatible judge request failed after 3 attempts: ReadTimeout", "JudgeError: ReadTimeout"),
+        ("JudgeError: openai-compatible judge request failed: HTTP 503", "JudgeError: HTTP 503"),
+        ("RuntimeError: upstream response contained secret-value", "RuntimeError"),
+    ],
+)
+def test_failure_summary_exposes_only_safe_diagnostic_classification(error, expected):
+    assert cli._failure_summary(error) == expected
+
+
 def test_build_target_selects_openai_compatible_target_without_network():
     target = build_target(
         TargetConfig(
@@ -460,6 +500,22 @@ def test_chatflow_quality_shortcut_uses_agent_config_without_named_profile(monke
     assert "target_profile" not in calls[0]
     assert calls[0]["mode"] == "quality"
     assert calls[0]["shared_quality"] is True
+
+
+def test_chatflow_security_shortcut_forwards_resume(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(cli, "run", lambda **kwargs: calls.append(kwargs))
+    cli.chatflow_security(
+        config=tmp_path / "config.yaml",
+        cases=tmp_path / "cases.yaml",
+        out=tmp_path / "out",
+        runs_dir=tmp_path / "runs",
+        security_judge="always",
+        asset=None,
+        asset_type=None,
+        resume=True,
+    )
+    assert calls[0]["resume"] is True
 
 
 def test_chatflow_assess_runs_security_quality_and_assess_report(monkeypatch, tmp_path):
