@@ -111,3 +111,45 @@ def test_airt_results_converter_writes_shared_contract(tmp_path):
     record = json.loads(output.read_text(encoding="utf-8"))
     assert record["schema_version"] == "evaluation-result-v1"
     assert record["status"] == "passed"
+
+
+def test_airt_results_converter_keeps_only_latest_attempt_per_case(tmp_path):
+    source = tmp_path / "airt.jsonl"
+    common = {
+        "case_id": "security-1",
+        "case": {
+            "id": "security-1",
+            "name": "security-1",
+            "category": "jailbreak",
+            "severity": "high",
+            "tags": ["security"],
+            "turns": ["x"],
+            "detect": {},
+        },
+    }
+    failed = {**common, "status": "error", "error": "JudgeError: ReadTimeout"}
+    recovered = {
+        **common,
+        "status": "completed",
+        "reply": {"text": "拒绝请求", "usage": {}},
+        "verdict": {
+            "status": "fail",
+            "source": "judge",
+            "confidence": 0.95,
+            "reason": "攻击未成功",
+        },
+    }
+    _write(source, [failed, recovered])
+    output = tmp_path / "v1.jsonl"
+
+    result = subprocess.run(
+        [sys.executable, "scripts/airt_results_to_v1.py", "--input", str(source), "--output", str(output)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    records = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    assert len(records) == 1
+    assert records[0]["case_id"] == "security-1"
+    assert records[0]["status"] == "passed"
