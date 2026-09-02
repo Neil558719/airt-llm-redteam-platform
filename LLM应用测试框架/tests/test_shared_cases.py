@@ -10,7 +10,7 @@ from llmtest.shared_cases import load_quality_questions, load_shared_cases
 
 def test_pytest_framework_reads_repository_shared_cases():
     cases = load_shared_cases(ROOT / "shared_cases" / "unified_chatflow.yaml")
-    assert len(cases) == 8
+    assert len(cases) == 24
     assert {item["category"] for item in cases} == {"quality", "security", "tools"}
 
 

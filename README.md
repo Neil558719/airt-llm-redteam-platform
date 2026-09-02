@@ -123,8 +123,11 @@ python -m pytest -m live -q
 # 发布前门禁
 .\.venv\Scripts\airt.exe chatflow release
 
-# 只检查配置
-.\.venv\Scripts\airt.exe doctor --mode quality
+# 本地运行前检查（默认不访问 Dify/Judge）
+.\.venv\Scripts\airt.exe doctor --config config.dify.agent.yaml --mode quality --cases shared_cases/unified_chatflow.yaml
+
+# 显式检查本机 Dify/Judge 地址是否可达（仍不会执行测试用例）
+.\.venv\Scripts\airt.exe doctor --config config.dify.agent.yaml --mode quality --cases shared_cases/unified_chatflow.yaml --check-network
 ```
 
 旧的 `airt text ...` 纯文本命令以及 `rules`、`balanced` 档位已删除。需要脚本化或自定义用例时，使用 `airt run --config ... --cases ... --mode security|quality|release`。
@@ -138,6 +141,21 @@ python -m pytest -m live -q
 .\.venv\Scripts\airt.exe trend --reports reports/quality
 .\.venv\Scripts\airt.exe dashboard --reports reports
 ```
+
+离线回归基线不访问 Dify 或 Judge，可在确认一次结果后保存基线，并比较后续运行是否发生回归：
+
+```powershell
+# 保存基线（JSONL 原文件 + 同名 JSON 元信息）
+.\.venv\Scripts\airt.exe baseline save `
+  --results runs/chatflow-quality/results.jsonl `
+  --out baselines/chatflow-quality.jsonl
+
+# 一条命令比较最近一次 assess；自动合并安全和质量 JSONL
+.\.venv\Scripts\airt.exe baseline compare-assess `
+  --baseline baselines/chatflow-assess.jsonl
+```
+
+默认从 `runs/chatflow-assess/` 读取最近结果；也可以用 `--run-dir runs/chatflow-assess-20260825` 指定某次运行。比较会检查用例缺失、回答相似度、状态变化和工具调用变化；如需限制性能退化，可增加 `--max-latency-increase 0.5`（表示延迟最多增加 50%）。比较结果自动写入 `reports/baseline-assess/<时间戳>/comparison.json` 和 `comparison.html`，失败时命令返回退出码 1。高级 `baseline compare` 仍可用于手动比较任意两个 JSONL。
 
 GitHub Actions 会自动运行测试、校验共享用例，并将报告和 Dashboard 上传为构建 artifact。
 

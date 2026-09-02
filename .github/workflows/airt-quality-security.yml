@@ -58,6 +58,9 @@ jobs:
     needs: offline
     steps:
       - uses: actions/checkout@v4
+        env:
+          HTTP_PROXY: http://127.0.0.1:10808
+          HTTPS_PROXY: http://127.0.0.1:10808
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -65,6 +68,30 @@ jobs:
       - run: .venv\Scripts\python.exe -m pip install -e ".[test]"
       - name: Run Chatflow security
         run: .venv\Scripts\airt.exe chatflow security --config config.dify.agent.yaml --out runs/ci-chatflow
+        env:
+          DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
+          JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
+          JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
+          JUDGE_MODEL: ${{ secrets.JUDGE_MODEL }}
+      - name: Run image input smoke security
+        run: >-
+          .venv\Scripts\airt.exe chatflow security
+          --config config.dify.agent.yaml
+          --asset fixtures\multimodal\prompt_injection.png
+          --asset-type image
+          --out runs/ci-chatflow-multimodal-image
+        env:
+          DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
+          JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
+          JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
+          JUDGE_MODEL: ${{ secrets.JUDGE_MODEL }}
+      - name: Run audio input smoke security
+        run: >-
+          .venv\Scripts\airt.exe chatflow security
+          --config config.dify.agent.yaml
+          --asset fixtures\multimodal\prompt_injection.wav
+          --asset-type audio
+          --out runs/ci-chatflow-multimodal-audio
         env:
           DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
           JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
@@ -84,6 +111,8 @@ jobs:
             reports/security/
             artifacts/security/
             runs/ci-chatflow/results.jsonl
+            runs/ci-chatflow-multimodal-image/results.jsonl
+            runs/ci-chatflow-multimodal-audio/results.jsonl
 
   live-chatflow-quality:
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && inputs.run_live == true) }}
@@ -91,6 +120,9 @@ jobs:
     needs: [offline, shared-quality]
     steps:
       - uses: actions/checkout@v4
+        env:
+          HTTP_PROXY: http://127.0.0.1:10808
+          HTTPS_PROXY: http://127.0.0.1:10808
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
