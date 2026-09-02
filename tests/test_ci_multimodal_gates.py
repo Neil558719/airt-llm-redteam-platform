@@ -65,3 +65,9 @@ def test_unified_gate_always_runs_after_all_live_jobs():
         "live-chatflow-quality",
     }
     assert "always()" in gate["if"]
+
+
+def test_feature_branches_run_once_via_pull_request_event():
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "push:\n    branches: [main]" in workflow

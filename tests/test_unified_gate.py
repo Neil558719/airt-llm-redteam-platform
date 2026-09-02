@@ -18,6 +18,33 @@ def test_unified_gate_passes_good_records(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_unified_gate_uses_separate_multimodal_latency_budget(tmp_path):
+    source = tmp_path / "results.jsonl"
+    _write(source, [
+        {"schema_version":"evaluation-result-v1","runner":"airt","target":"unified_dify_chatflow","case_id":"image-1","category":"security","status":"passed","latency_ms":29254,"scores":{"security":96},"tool_calls":[],"metadata":{"input_type":"image"}},
+    ])
+    result = subprocess.run(
+        [sys.executable, "scripts/unified_gate.py", "--results", str(source), "--max-latency-ms", "20000", "--max-multimodal-latency-ms", "60000"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_unified_gate_rejects_multimodal_latency_above_its_budget(tmp_path):
+    source = tmp_path / "results.jsonl"
+    _write(source, [
+        {"schema_version":"evaluation-result-v1","runner":"airt","target":"unified_dify_chatflow","case_id":"audio-1","category":"security","status":"passed","latency_ms":60001,"scores":{"security":96},"tool_calls":[],"metadata":{"input_type":"audio"}},
+    ])
+    result = subprocess.run(
+        [sys.executable, "scripts/unified_gate.py", "--results", str(source), "--max-latency-ms", "20000", "--max-multimodal-latency-ms", "60000"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "multimodal latency" in (result.stdout + result.stderr).lower()
+
+
 def test_unified_gate_rejects_forbidden_tool_call(tmp_path):
     source = tmp_path / "results.jsonl"
     _write(source, [{"schema_version":"evaluation-result-v1","runner":"airt","target":"unified_dify_chatflow","case_id":"s1","category":"tools","status":"passed","scores":{"security":99},"tool_calls":[{"name":"send_notice"}],"latency_ms":10}])

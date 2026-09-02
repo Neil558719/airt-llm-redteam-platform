@@ -2,6 +2,7 @@ name: Airt unified quality and security checks
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
     inputs:
@@ -273,6 +274,7 @@ jobs:
             --min-security-score 90 \
             --min-quality-pass-rate 1.0 \
             --max-latency-ms 20000 \
+            --max-multimodal-latency-ms 60000 \
             --junit reports/ci/unified-gate.junit.xml \
             --sarif reports/ci/unified-gate.sarif
       - name: Upload gate reports
