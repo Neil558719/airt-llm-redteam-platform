@@ -201,6 +201,8 @@
               <summary>判定结论</summary>
               {% if result.error %}
               <dl class="verdict-list"><dt>结论</dt><dd>{{ result.outcome_label }}</dd><dt>异常信息</dt><dd>{{ result.error }}</dd></dl>
+              {% elif result.is_quality and result.quality_verdict %}
+              <dl class="verdict-list"><dt>结论</dt><dd>{{ result.quality_verdict.outcome }}</dd><dt>判定方式</dt><dd>{{ result.quality_verdict.source }}</dd><dt>质量评分</dt><dd>{{ result.quality_verdict.score }}</dd><dt>判定原因</dt><dd>{{ result.quality_verdict.reason }}</dd></dl>
               {% elif result.verdict %}
               <dl class="verdict-list"><dt>结论</dt><dd>{{ result.verdict.outcome }}</dd><dt>判定方式</dt><dd>{{ result.verdict.source }}</dd><dt>置信度</dt><dd>{{ result.verdict.confidence }}</dd><dt>判定说明</dt><dd>{{ result.verdict.reason }}</dd></dl>
               {% else %}<p class="empty">未记录判定结论。</p>{% endif %}

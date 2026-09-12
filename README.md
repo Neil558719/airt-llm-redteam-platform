@@ -4,8 +4,6 @@
 
 当前稳定版本：v0.1.0 · [GitHub Release](https://github.com/Neil558719/airt-llm-redteam-platform/releases/tag/v0.1.0)
 
-> 仅测试你拥有或已获得明确授权的应用。项目默认使用本地无害代理工具，不执行真实订单修改、外部通知或其他现实世界副作用。
-
 ## 项目亮点
 
 - 统一测试入口：同一套 CLI 支持 OpenAI 兼容 API、Dify Chat API 和 Dify Chatflow。
@@ -159,17 +157,6 @@ git diff --check
 ~~~
 
 不要提交 API Key、真实客户数据、本地 Dify 数据库文件或包含敏感内容的运行结果。更多细节见 docs/CI统一门禁说明.md、docs/架构与测试闭环.md 和 DIFY_MIGRATION_CHECKLIST.md。
-
-## 求职项目展示要点
-
-该项目体现的是一套接近企业日常工作的质量工程闭环：
-
-- 将安全、质量、工具调用和多模态测试统一到可复现 CLI；
-- 设计安全 Judge、失败分类、结果契约和报告归档，支持审计与趋势分析；
-- 通过共享用例避免 Airt 与 pytest 两套数据漂移；
-- 使用 Self-hosted Runner 把本地依赖的 Dify Chatflow 接入 PR 门禁；
-- 通过独立 smoke、一次失败续跑、artifact 完整性检查和 unified gate 控制发布风险；
-- 已完成从开发、验证、合并到 v0.1.0 稳定版发布的完整工程流程。
 
 ## License
 
