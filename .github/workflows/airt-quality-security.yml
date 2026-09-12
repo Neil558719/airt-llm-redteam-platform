@@ -93,6 +93,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: airt-chatflow-security
+          overwrite: true
           path: |
             reports/security/
             artifacts/security/
@@ -136,6 +137,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: airt-chatflow-image-smoke
+          overwrite: true
           path: |
             reports/security/
             artifacts/security/
@@ -179,6 +181,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: airt-chatflow-audio-smoke
+          overwrite: true
           path: |
             reports/security/
             artifacts/security/
@@ -215,6 +218,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: airt-chatflow-quality
+          overwrite: true
           path: |
             reports/quality/
             artifacts/quality/
