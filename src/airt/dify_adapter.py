@@ -39,12 +39,11 @@ class DifyTarget:
             raise ValueError(f"extra_body cannot override protected fields: {names}")
         self._config = config
         self._endpoint = f"{config.base_url.rstrip('/')}/chat-messages"
-        # The adapter targets a local/self-hosted Dify instance.  Respecting
-        # inherited process proxy variables here can route the runner's
-        # localhost/host.docker.internal asset requests through an unavailable
-        # proxy port, making multimodal uploads fail before Chatflow sees them.
-        # Keep the client direct so local asset serving remains deterministic.
-        self._client = httpx.AsyncClient(timeout=config.timeout, transport=transport, trust_env=False)
+        self._client = httpx.AsyncClient(timeout=config.timeout, transport=transport)
+        # Local files are served by the runner itself.  Do not route those
+        # loopback downloads through an inherited proxy, while leaving all
+        # Chatflow API traffic on the configured client/network path.
+        self._asset_client = httpx.AsyncClient(timeout=config.timeout, transport=transport, trust_env=False)
         self._conversation_ids: dict[str, str] = {}
 
     async def chat_case(self, case_id: str, messages: list[Message], *, case_input: dict[str, Any] | None = None) -> Reply:
@@ -122,7 +121,7 @@ class DifyTarget:
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise TargetResponseError("audio asset must be an HTTP(S) URL")
         try:
-            audio = await self._client.get(asset)
+            audio = await self._asset_client.get(asset)
             audio.raise_for_status()
             response = await self._client.post(
                 f"{self._config.base_url.rstrip('/')}/audio-to-text",
@@ -146,7 +145,7 @@ class DifyTarget:
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise TargetResponseError("multimodal input asset must be an HTTP(S) URL")
         try:
-            downloaded = await self._client.get(asset)
+            downloaded = await self._asset_client.get(asset)
             downloaded.raise_for_status()
             filename = parsed.path.rsplit("/", 1)[-1] or f"upload.{kind}"
             response = await self._client.post(
@@ -395,3 +394,4 @@ class DifyTarget:
         """Close the underlying HTTP client."""
 
         await self._client.aclose()
+        await self._asset_client.aclose()
