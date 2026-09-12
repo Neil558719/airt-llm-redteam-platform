@@ -32,10 +32,6 @@ _OUTCOME_LABELS = {
     "uncertain": "结论不确定（建议人工复核）",
     "error": "执行异常（未纳入攻击成功率）",
 }
-_QUALITY_OUTCOME_LABELS = {
-    True: "质量评测通过",
-    False: "质量评测未通过",
-}
 _SOURCE_LABELS = {"rule": "规则判定", "judge": "独立裁判模型"}
 _ROLE_LABELS = {
     "user": "测试请求",
@@ -159,31 +155,9 @@ def case_display(result: CaseResult) -> dict[str, Any]:
             start=1,
         )
     ]
-    is_quality = result.quality is not None
     outcome = outcome_key(result)
     verdict: dict[str, str] | None = None
-    quality_verdict: dict[str, str] | None = None
-    if is_quality:
-        quality_data = result.quality or {}
-        quality_passed = quality_data.get("passed")
-        if quality_passed is not None or quality_data:
-            quality_verdict = {
-                "outcome": _QUALITY_OUTCOME_LABELS[bool(quality_passed)] if quality_passed is not None else "质量评测未确定",
-                "source": "独立裁判模型" if quality_data.get("judge_passed") is not None else "离线质量规则",
-                "score": (
-                    f"{float(quality_data['judge_score']) * 100:.1f}%"
-                    if quality_data.get("judge_score") is not None
-                    else "—"
-                ),
-                "reason": str(
-                    redact(
-                        quality_data.get("judge_reason")
-                        or "；".join(str(item) for item in quality_data.get("errors", []))
-                        or "未记录质量判定原因"
-                    )
-                ),
-            }
-    elif result.verdict is not None:
+    if result.verdict is not None:
         verdict = {
             "outcome": outcome_label(outcome),
             "source": source_label(result.verdict.source),
@@ -211,8 +185,6 @@ def case_display(result: CaseResult) -> dict[str, Any]:
         "severity": severity_label(case.severity) if case is not None else "未知",
         "outcome": outcome,
         "outcome_label": outcome_label(outcome),
-        "is_quality": is_quality,
-        "quality_verdict": quality_verdict,
         "latency": f"{result.latency_ms:.1f} 毫秒" if result.latency_ms is not None else "—",
         "requests": requests,
         "context_messages": context_messages,
