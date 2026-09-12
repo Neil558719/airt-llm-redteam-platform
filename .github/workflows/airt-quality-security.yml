@@ -59,9 +59,6 @@ jobs:
     needs: offline
     steps:
       - uses: actions/checkout@v4
-        env:
-          HTTP_PROXY: http://127.0.0.1:10808
-          HTTPS_PROXY: http://127.0.0.1:10808
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -104,9 +101,6 @@ jobs:
     needs: offline
     steps:
       - uses: actions/checkout@v4
-        env:
-          HTTP_PROXY: http://127.0.0.1:10808
-          HTTPS_PROXY: http://127.0.0.1:10808
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -147,9 +141,6 @@ jobs:
     needs: offline
     steps:
       - uses: actions/checkout@v4
-        env:
-          HTTP_PROXY: http://127.0.0.1:10808
-          HTTPS_PROXY: http://127.0.0.1:10808
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -190,9 +181,6 @@ jobs:
     needs: [offline, shared-quality]
     steps:
       - uses: actions/checkout@v4
-        env:
-          HTTP_PROXY: http://127.0.0.1:10808
-          HTTPS_PROXY: http://127.0.0.1:10808
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
