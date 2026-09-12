@@ -32,6 +32,16 @@ class JudgeResponse(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     reason: str = Field(min_length=1)
 
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def normalize_confidence_label(cls, value: object) -> object:
+        """Accept common qualitative confidence labels from compatible APIs."""
+
+        if isinstance(value, str):
+            labels = {"high": 0.9, "medium": 0.7, "low": 0.4}
+            return labels.get(value.strip().casefold(), value)
+        return value
+
     @field_validator("verdict")
     @classmethod
     def verdict_is_supported(cls, value: str) -> str:
