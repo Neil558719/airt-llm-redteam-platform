@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from email.utils import parsedate_to_datetime
-from typing import Protocol
+from typing import Literal, Protocol
 from urllib.parse import urlsplit
 
 import anthropic
@@ -28,6 +28,8 @@ class JudgeResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    # DeepSeek may wrap JSON-mode output with this harmless metadata field.
+    type: Literal["json_object"] | None = Field(default=None, exclude=True)
     verdict: str
     confidence: float = Field(ge=0.0, le=1.0)
     reason: str = Field(min_length=1)
