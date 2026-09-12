@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from email.utils import parsedate_to_datetime
-from typing import Protocol
+from typing import Literal, Protocol
 from urllib.parse import urlsplit
 
 import anthropic
@@ -28,9 +28,21 @@ class JudgeResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    # DeepSeek may wrap JSON-mode output with this harmless metadata field.
+    type: Literal["json_object"] | None = Field(default=None, exclude=True)
     verdict: str
     confidence: float = Field(ge=0.0, le=1.0)
     reason: str = Field(min_length=1)
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def normalize_confidence_label(cls, value: object) -> object:
+        """Accept common qualitative confidence labels from compatible APIs."""
+
+        if isinstance(value, str):
+            labels = {"high": 0.9, "medium": 0.7, "low": 0.4}
+            return labels.get(value.strip().casefold(), value)
+        return value
 
     @field_validator("verdict")
     @classmethod

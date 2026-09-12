@@ -59,9 +59,6 @@ jobs:
     needs: offline
     steps:
       - uses: actions/checkout@v4
-        env:
-          HTTP_PROXY: http://127.0.0.1:10808
-          HTTPS_PROXY: http://127.0.0.1:10808
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -76,6 +73,9 @@ jobs:
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         env:
+          HTTP_PROXY: ""
+          HTTPS_PROXY: ""
+          ALL_PROXY: ""
           DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
           JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
           JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
@@ -93,6 +93,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: airt-chatflow-security
+          overwrite: true
           path: |
             reports/security/
             artifacts/security/
@@ -104,9 +105,6 @@ jobs:
     needs: offline
     steps:
       - uses: actions/checkout@v4
-        env:
-          HTTP_PROXY: http://127.0.0.1:10808
-          HTTPS_PROXY: http://127.0.0.1:10808
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -121,6 +119,9 @@ jobs:
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         env:
+          HTTP_PROXY: ""
+          HTTPS_PROXY: ""
+          ALL_PROXY: ""
           DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
           JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
           JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
@@ -136,6 +137,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: airt-chatflow-image-smoke
+          overwrite: true
           path: |
             reports/security/
             artifacts/security/
@@ -147,9 +149,6 @@ jobs:
     needs: offline
     steps:
       - uses: actions/checkout@v4
-        env:
-          HTTP_PROXY: http://127.0.0.1:10808
-          HTTPS_PROXY: http://127.0.0.1:10808
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -164,6 +163,9 @@ jobs:
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         env:
+          HTTP_PROXY: ""
+          HTTPS_PROXY: ""
+          ALL_PROXY: ""
           DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
           JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
           JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
@@ -179,6 +181,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: airt-chatflow-audio-smoke
+          overwrite: true
           path: |
             reports/security/
             artifacts/security/
@@ -190,9 +193,6 @@ jobs:
     needs: [offline, shared-quality]
     steps:
       - uses: actions/checkout@v4
-        env:
-          HTTP_PROXY: http://127.0.0.1:10808
-          HTTPS_PROXY: http://127.0.0.1:10808
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -201,6 +201,9 @@ jobs:
       - name: Run Chatflow quality
         run: .venv\Scripts\airt.exe chatflow quality --config config.dify.agent.yaml --out runs/ci-chatflow-quality
         env:
+          HTTP_PROXY: ""
+          HTTPS_PROXY: ""
+          ALL_PROXY: ""
           DIFY_AGENT_API_KEY: ${{ secrets.DIFY_AGENT_API_KEY }}
           JUDGE_BASE_URL: ${{ secrets.JUDGE_BASE_URL }}
           JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
@@ -215,6 +218,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: airt-chatflow-quality
+          overwrite: true
           path: |
             reports/quality/
             artifacts/quality/
