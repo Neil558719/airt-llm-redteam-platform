@@ -39,7 +39,13 @@ class DifyTarget:
             raise ValueError(f"extra_body cannot override protected fields: {names}")
         self._config = config
         self._endpoint = f"{config.base_url.rstrip('/')}/chat-messages"
-        self._client = httpx.AsyncClient(timeout=config.timeout, transport=transport)
+        target_host = urlparse(config.base_url).hostname
+        direct_target = target_host in {"127.0.0.1", "localhost", "::1"}
+        self._client = httpx.AsyncClient(
+            timeout=config.timeout,
+            transport=transport,
+            trust_env=not direct_target,
+        )
         # Local files are served by the runner itself.  Do not route those
         # loopback downloads through an inherited proxy, while leaving all
         # Chatflow API traffic on the configured client/network path.
