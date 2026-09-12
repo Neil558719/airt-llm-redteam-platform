@@ -170,7 +170,3 @@ git diff --check
 - 使用 Self-hosted Runner 把本地依赖的 Dify Chatflow 接入 PR 门禁；
 - 通过独立 smoke、一次失败续跑、artifact 完整性检查和 unified gate 控制发布风险；
 - 已完成从开发、验证、合并到 v0.1.0 稳定版发布的完整工程流程。
-
-## License
-
-当前仓库未声明开源许可证。若要公开分发，请在发布前补充明确的 License 文件和第三方依赖声明。
