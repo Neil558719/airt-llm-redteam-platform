@@ -62,9 +62,7 @@ def _select_multimodal_case(cases_path: Path, asset: Path, asset_type: str | Non
 
 
 def _multimodal_asset_url(port: int, asset: Path) -> str:
-    # Dify runs inside Docker; host loopback is not reachable from the
-    # container, while host.docker.internal resolves to the Windows host.
-    return f"http://host.docker.internal:{port}/{asset.name}"
+    return f"http://127.0.0.1:{port}/{asset.name}"
 
 
 def _result_errors(results: list[CaseResult]) -> list[CaseResult]:
