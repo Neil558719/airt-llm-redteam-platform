@@ -39,7 +39,12 @@ class DifyTarget:
             raise ValueError(f"extra_body cannot override protected fields: {names}")
         self._config = config
         self._endpoint = f"{config.base_url.rstrip('/')}/chat-messages"
-        self._client = httpx.AsyncClient(timeout=config.timeout, transport=transport)
+        # The adapter targets a local/self-hosted Dify instance.  Respecting
+        # inherited process proxy variables here can route the runner's
+        # localhost/host.docker.internal asset requests through an unavailable
+        # proxy port, making multimodal uploads fail before Chatflow sees them.
+        # Keep the client direct so local asset serving remains deterministic.
+        self._client = httpx.AsyncClient(timeout=config.timeout, transport=transport, trust_env=False)
         self._conversation_ids: dict[str, str] = {}
 
     async def chat_case(self, case_id: str, messages: list[Message], *, case_input: dict[str, Any] | None = None) -> Reply:
