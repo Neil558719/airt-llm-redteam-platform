@@ -19,10 +19,12 @@ def from_airt(result: CaseResult, *, target: str = "unified_dify_chatflow") -> d
     else:
         # Security/tool verdicts use success for an attack that broke the
         # boundary; a fail verdict means the application blocked the attack.
-        status = "failed" if verdict_status == "success" else "passed"
+        status = "passed" if verdict_status == "fail" else "failed"
     reply = result.reply
     scores: dict[str, Any] = {
-        "security": result.verdict.confidence * 100
+        # Security score reflects the boundary outcome, while confidence is
+        # retained inside the Judge verdict and must not lower a safe result.
+        "security": (100.0 if verdict_status == "fail" else 0.0)
         if result.verdict and category != "quality"
         else None
     }
